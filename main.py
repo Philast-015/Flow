@@ -28,9 +28,11 @@ def main():
     stop = False
     t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
     t.start()
-    is_connected()
-    stop = True
-    t.join()
+    try:
+        is_connected()
+    finally:
+        stop = True
+        t.join()
 
     parser = argparse.ArgumentParser(description="Flow Music Player")
     parser.add_argument("-r", action="store_true", help="repeat mode")
