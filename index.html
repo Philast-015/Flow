@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flow Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;line-height:1.6;max-width:800px;margin:0 auto;padding:20px;background:#0d1117;color:#c9d1d9}
+video{width:100%;border-radius:8px;margin-bottom:32px}
+h1{border-bottom:1px solid #30363d;padding-bottom:8px;margin:24px 0 16px}
+h2{border-bottom:1px solid #30363d;padding-bottom:6px;margin:24px 0 16px}
+a{color:#58a6ff}
+code{background:#161b22;padding:2px 6px;border-radius:4px;font-size:.9em}
+pre{background:#161b22;padding:16px;border-radius:8px;overflow-x:auto;margin:16px 0}
+pre code{background:0;padding:0}
+table{border-collapse:collapse;width:100%;margin:16px 0}
+th,td{border:1px solid #30363d;padding:8px 12px;text-align:left}
+th{background:#161b22}
+ul,ol{padding-left:24px;margin:16px 0}
+li{margin:4px 0}
+strong{color:#f0f6fc}
+hr{border:0;border-top:1px solid #30363d;margin:24px 0}
+</style>
+</head>
+<body>
+
+<video controls autoplay muted loop playsinline>
+  <source src="demo.mp4" type="video/mp4">
+</video>
+
+<div id="content"></div>
+
+<script>
+fetch('README.md').then(r=>r.text()).then(md=>{
+  document.getElementById('content').innerHTML=marked.parse(md)
+})
+</script>
+</body>
+</html>
