@@ -3,10 +3,10 @@ name: Build and Release Binaries
 on:
   push:
     tags:
-      - "v*" # triggers on tags like v1.0.0, v2.3.1, etc.
+      - "v*"
 
 permissions:
-  contents: write # needed to create the release and upload assets
+  contents: write
 
 jobs:
   build:
@@ -39,7 +39,7 @@ jobs:
 
       - name: Build binary
         run: |
-          pyinstaller --onefile --name "${{ matrix.output_name }}" main.py
+          pyinstaller --onefile --collect-submodules Online --collect-submodules Offline --name "${{ matrix.output_name }}" main.py
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
