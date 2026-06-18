@@ -27,11 +27,13 @@ python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 ```
 
-Or use the installer script:
+Or through pip:
 
 ```bash
-bash install.sh
+pip install flow-twinx
 ```
+
+### Note: Make sure you have python installed
 
 ## Usage
 
