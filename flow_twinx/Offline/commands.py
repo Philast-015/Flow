@@ -1,9 +1,9 @@
 import random
-from .. import config
-from ..config import merge_flags
+from ..imports import config, merge_flags, tprint, is_connected
+from .. import shortcuts
+from .. import help_detail
 from . import file as lib
 from . import player
-from ..tui import print as tprint
 
 try:
     import readline
@@ -15,12 +15,13 @@ _last_results = []
 _last_played = None
 
 COMMANDS = {
-    "play":    "Play song(s) from local library",
+    "play":    "Play song(s) from local library | all by play all | and liked",
     "search":  "Search local music library",
     "list":    "List local music library",
     "like":    "Like the currently playing song",
     "switch":  "Switch to Online mode (checks connection)",
     "help":    "Show this help message",
+    "short":   "Show/update command shortcuts",
     "exit":    "Exit Flow",
 }
 
@@ -66,6 +67,8 @@ def _setup_completion():
 
 def run(cmd: str, extra: list[str], args):
     _setup_completion()
+    cmd = shortcuts.resolve(cmd)
+    inf = "-i" in extra
     extra, args = merge_flags(extra, args)
     if cmd == "play":
         play(extra, args)
@@ -78,7 +81,9 @@ def run(cmd: str, extra: list[str], args):
     elif cmd == "switch":
         switch_mode()
     elif cmd == "help":
-        show_help()
+        show_help(inf)
+    elif cmd == "short":
+        shortcuts.cmd_short(extra, m)
     else:
         e(f"Unknown command: {cmd}")
 
@@ -93,7 +98,9 @@ def play(extra: list[str], args):
     if arg == "liked":
         _play_liked(args)
         return
-
+    elif arg == "all":
+        _play_all(args)
+        return
     if arg in lib.get_album_names():
         _play_album(arg, args)
         return
@@ -133,6 +140,16 @@ def _play_liked(args):
         _last_played = song
         player.play_file(song, song.stem, args)
 
+def _play_all(args):
+    all = lib.get_all_songs()
+    if not all:
+        e("No downloaded songs yet")
+        return
+    if getattr(args, "s", False):
+        random.shuffle(all)
+    for song in all:
+        _last_played = song
+        player.play_file(song, song.stem, args)
 
 def _play_album(album: str, args):
     songs = lib.get_album_songs(album)
@@ -194,14 +211,24 @@ def list_library():
 
 
 def switch_mode():
-    from ..ping import is_connected
     if is_connected():
         i("Switched to Online mode")
     else:
         e("No internet connection")
 
 
-def show_help():
-    i("Offline Commands:")
-    for cmd, desc in COMMANDS.items():
-        m(f"  {cmd:12s} {desc}")
+def show_help(inf=False):
+    _t = config.THEMES[config.THEME]["theme"]
+    _g = "\033[90m"
+    _r = "\033[0m"
+    if inf:
+        print(f"{_t}Offline Commands (detailed):{_r}")
+        for cmd, lines in help_detail.OFFLINE_HELP.items():
+            for line in lines:
+                print(f"  {line.replace('{theme}', _t)}")
+            print()
+    else:
+        print(f"{_t}Offline Commands:{_r}")
+        for cmd, desc in COMMANDS.items():
+            print(f"  {_t}{cmd:12s}{_r} {_g}{desc}{_r}")
+        print(f"{_g}  Use 'help -i' for detailed usage{_r}")

@@ -38,10 +38,11 @@ pip install flow-twinx
 ## Usage
 
 ```bash
+cd flow_twinx
 python main.py [-r] [-s] [-d]
 ```
 
-Or direct if you have used install.sh
+Or direct if you have used pypi
 
 ```bash
 flow <command> <flag>
@@ -74,21 +75,28 @@ flow <command> <flag>
 ## Project Structure
 
 ```
-Flow/
-├── config.py          # Configuration and theme settings
-├── main.py            # Entry point and REPL loop
-├── ping.py            # Internet connectivity check
-├── tui.py             # Terminal UI helpers
-├── requirements.txt   # Python dependencies
-├── install.sh         # Installer script
-├── Online/
-│   ├── commands.py    # Online mode commands
-│   ├── player.py      # VLC streaming player
-│   └── youtube.py     # YouTube search and download
-└── Offline/
-    ├── commands.py    # Offline mode commands
-    ├── file.py        # Library scanner and search
-    └── player.py      # Local file player
+flow/
+├── flow_twinx/                 # Main application package
+│   ├── __init__.py
+│   ├── config.py               # Configuration, themes, paths
+│   ├── imports.py              # Central import hub
+│   ├── main.py                 # Entry point / CLI
+│   ├── ping.py                 # Connection checker
+│   ├── tui.py                  # Terminal UI helpers (colors, banner, input)
+│   ├── Online/                 # Online streaming mode
+│   │   ├── __init__.py
+│   │   ├── commands.py         # Online command handlers
+│   │   ├── player.py           # VLC-based stream player
+│   │   └── youtube.py          # YouTube search & download via yt-dlp
+│   └── Offline/                # Offline local library mode
+│       ├── __init__.py
+│       ├── commands.py         # Offline command handlers
+│       ├── file.py             # Local file & library management
+│       ├── player.py           # VLC-based local file player
+│       └── youtube.py          # Placeholder
+├── pyproject.toml              # Package metadata & build config
+├── requirements.txt            # Dependencies (python-vlc, yt_dlp)
+└── README.md
 ```
 
 ## License

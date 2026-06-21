@@ -2,23 +2,24 @@ import random
 import sys
 import threading
 import time
-from .. import config
-from ..config import merge_flags
+from ..imports import config, merge_flags, tprint
+from .. import shortcuts
+from .. import help_detail
 from . import youtube
 from . import player
-from ..tui import print as tprint
 
 _last_results = []
 _last_played = None
 
 COMMANDS = {
-    "play":  "Play a song from YouTube",
-    "search": "Search YouTube for tracks",
-    "like":  "Like a song",
+    "play":     "Play a song from YouTube",
+    "search":   "Search YouTube for tracks",
+    "like":     "Like a song",
     "download": "Download audio from YouTube",
-    "switch": "Switch to Offline mode",
-    "help":  "Show this help message",
-    "exit":  "Exit Flow",
+    "switch":   "Switch to Offline mode",
+    "help":     "Show this help message",
+    "short":    "Show/update command shortcuts",
+    "exit":     "Exit Flow",
 }
 
 m = tprint(color="grey", border="none")
@@ -26,6 +27,8 @@ e = tprint(color="red", border="none")
 i = tprint(color="theme", border="none")
 
 def run(cmd: str, extra: list[str], args):
+    cmd = shortcuts.resolve(cmd)
+    inf = "-i" in extra
     extra, args = merge_flags(extra, args)
     if cmd == "play":
         play(extra, args)
@@ -38,7 +41,9 @@ def run(cmd: str, extra: list[str], args):
     elif cmd == "switch":
         switch_mode()
     elif cmd == "help":
-        show_help()
+        show_help(inf)
+    elif cmd == "short":
+        shortcuts.cmd_short(extra, m)
     else:
         print(f"Unknown command: {cmd}")
 
@@ -199,7 +204,18 @@ def switch_mode():
     m("Switched to Offline mode")
 
 
-def show_help():
-    print(f"{config.THEMES[config.THEME]['theme']}Online Commands:{chr(27)}[0m")
-    for cmd, desc in COMMANDS.items():
-        print(f"  {cmd:12s} {desc}")
+def show_help(inf=False):
+    _t = config.THEMES[config.THEME]["theme"]
+    _g = "\033[90m"
+    _r = "\033[0m"
+    if inf:
+        print(f"{_t}Online Commands (detailed):{_r}")
+        for cmd, lines in help_detail.ONLINE_HELP.items():
+            for line in lines:
+                print(f"  {line.replace('{theme}', _t)}")
+            print()
+    else:
+        print(f"{_t}Online Commands:{_r}")
+        for cmd, desc in COMMANDS.items():
+            print(f"  {_t}{cmd:12s}{_r} {_g}{desc}{_r}")
+        print(f"{_g}  Use 'help -i' for detailed usage{_r}")

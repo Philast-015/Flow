@@ -1,6 +1,6 @@
 import pathlib
 import shutil
-from .. import config
+from ..imports import config
 
 AUDIO_EXTENSIONS = {".mp3", ".flac", ".wav", ".m4a", ".ogg", ".opus", ".wma", ".aac",".webm"}
 LIKED_DIR_NAME = "liked songs"

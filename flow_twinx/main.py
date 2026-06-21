@@ -3,9 +3,15 @@ import importlib
 import sys
 import threading
 import time
-from . import config
-from .tui import show_banner, input as tui_input, print as tui_print
-from .ping import is_connected
+from pathlib import Path
+
+if __name__ == "__main__" and __package__ is None:
+    __package__ = "flow_twinx"
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from .imports import config, show_banner, tui_input, is_connected
+from .imports import tprint as tui_print
+from . import shortcuts
 
 
 def _spinner(stop):
@@ -42,6 +48,7 @@ def main():
 
     args, unknown = parser.parse_known_args()
 
+    shortcuts.load()
     commands = _load_commands()
 
     show_banner()
@@ -58,6 +65,7 @@ def main():
                     continue
                 cmd = parts[0].lower()
                 extra = parts[1:]
+                cmd = shortcuts.resolve(cmd)
                 if cmd in ("exit", "quit", "q"):
                     tui_print(color="grey", border="none")("Goodbye!")
                     break
