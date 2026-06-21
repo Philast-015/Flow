@@ -3,9 +3,9 @@ import importlib
 import sys
 import threading
 import time
-import config
-from tui import show_banner, input as tui_input, print as tui_print
-from ping import is_connected
+from . import config
+from .tui import show_banner, input as tui_input, print as tui_print
+from .ping import is_connected
 
 
 def _spinner(stop):
@@ -21,7 +21,7 @@ def _spinner(stop):
 
 
 def _load_commands():
-    return importlib.import_module(f"{config.Mode}.commands")
+    return importlib.import_module(f".{config.Mode}.commands", package=__package__)
 
 
 def main():

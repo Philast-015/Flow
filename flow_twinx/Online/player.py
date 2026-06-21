@@ -1,7 +1,7 @@
 import sys
 import time
 import vlc
-from tui import print as tprint
+from ..tui import print as tprint
 
 m = tprint(color="grey", border="none")
 e = tprint(color="red", border="none")

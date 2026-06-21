@@ -1,6 +1,6 @@
 import socket
 import urllib.request
-import config
+from . import config
 
 
 def is_connected(timeout: int = 2, hosts: list[str] | None = None) -> bool:

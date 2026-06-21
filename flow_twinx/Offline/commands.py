@@ -1,9 +1,9 @@
 import random
-import config
-from config import merge_flags
+from .. import config
+from ..config import merge_flags
 from . import file as lib
 from . import player
-from tui import print as tprint
+from ..tui import print as tprint
 
 try:
     import readline
@@ -194,7 +194,7 @@ def list_library():
 
 
 def switch_mode():
-    from ping import is_connected
+    from ..ping import is_connected
     if is_connected():
         i("Switched to Online mode")
     else:

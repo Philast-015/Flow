@@ -1,5 +1,5 @@
 import builtins
-import config
+from . import config
 
 RESET = "\033[0m"
 

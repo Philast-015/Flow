@@ -1,12 +1,12 @@
-import config
 import random
 import sys
 import threading
 import time
-from config import merge_flags
+from .. import config
+from ..config import merge_flags
 from . import youtube
 from . import player
-from tui import print as tprint
+from ..tui import print as tprint
 
 _last_results = []
 _last_played = None

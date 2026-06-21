@@ -2,4 +2,4 @@ __pycache__
 .local
 .env
 .venv
-__**
+dist
