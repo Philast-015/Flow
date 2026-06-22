@@ -30,9 +30,3 @@ def is_connected(timeout: int = 2, hosts: list[str] | None = None) -> bool:
     config.Mode = "Offline"
     config.THEME = config.OFFLINE_THEME
     return False
-
-
-# if __name__ == "__main__":
-#     connected = is_connected()
-#     print(f"Status : {config.Mode}")
-#     print(f"Returns: {connected}")

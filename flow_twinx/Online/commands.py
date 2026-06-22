@@ -14,6 +14,7 @@ _last_played = None
 COMMANDS = {
     "play":     "Play a song from YouTube",
     "search":   "Search YouTube for tracks",
+    "radio":    "Generate a radio mix from a reference song",
     "like":     "Like a song",
     "download": "Download audio from YouTube",
     "switch":   "Switch to Offline mode",
@@ -42,6 +43,8 @@ def run(cmd: str, extra: list[str], args):
         switch_mode()
     elif cmd == "help":
         show_help(inf)
+    elif cmd in ("radio", "rd"):
+        radio(extra, args)
     elif cmd == "short":
         shortcuts.cmd_short(extra, m)
     else:
@@ -162,6 +165,63 @@ def search(query: str):
     for i, (_, title, dur) in enumerate(_last_results, 1):
         mins, secs = divmod(int(dur), 60)
         m(f"  {i}. {title}  ({mins}:{secs:02d})")
+
+def _truncate_title(title):
+    words = title.split()
+    return " ".join(words[:3]) if len(words) > 3 else title
+
+
+def radio(extra, args):
+    query = " ".join(extra) if extra else None
+    if not query:
+        e("     Usage: radio <song_name>")
+        return
+
+    stop = False
+    t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
+    t.start()
+    tracks = youtube.fetch_radio(query, config.MAX_RESULTS_RADIO)
+    stop = True
+    t.join()
+
+    if not tracks:
+        e("     No radio tracks found")
+        return
+
+    _t = config.THEMES[config.THEME]["theme"]
+    print(f"{_t}\n  Radio mix based on \"{query}\":\n")
+    for i, (title, vid, dur) in enumerate(tracks, 1):
+        short = _truncate_title(title)
+        mins, secs = divmod(int(dur), 60)
+        print(f"  {i:2d}. {short:30s} {mins}:{secs:02d}")
+
+    for i, (title, vid, dur) in enumerate(tracks):
+        upcoming = tracks[i + 1:i + 4]
+        if upcoming:
+            print(f"\n  {'─' * 36}")
+            for ut, uv, ud in upcoming:
+                short = _truncate_title(ut)
+                m, s = divmod(int(ud), 60)
+                print(f"\t→ {short:30s} {m}:{s:02d}")
+            print(f"  {'─' * 36}")
+
+        url = f"https://www.youtube.com/watch?v={vid}"
+        entry = youtube.get_entry(url)
+        short = _truncate_title(title)
+        mins, secs = divmod(int(dur), 60)
+        i(f"\tNow Playing: {short}  ({mins}:{secs:02d})")
+
+        filepath = None
+        if getattr(args, "d", False):
+            m(f"\tDownloading {short}...")
+            filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
+            m(f"\tDownloaded to {filepath}")
+
+        try:
+            player.play_entry(entry, title, args, filepath, stop_on_interrupt=True)
+        except KeyboardInterrupt:
+            break
+
 
 def download(extra: list[str]):
     global _last_results

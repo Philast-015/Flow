@@ -40,6 +40,12 @@ ONLINE_HELP = {
         f"    {_G}download never gonna give you up{_R}",
         f"    {_G}download 2{_R}",
     ],
+    "radio": [
+        f"{_T}> radio{_R} {_M}<song_name>{_R}",
+        f"{_G}  Generate a radio mix based on a reference song.{_R}",
+        f"{_G}  Plays related songs sequentially from YouTube Music.{_R}",
+        f"{_G}  Press Ctrl+C to stop. Alias:{_R} {_M}rd{_R}",
+    ],
     "switch": [
         f"{_T}> switch{_R}",
         f"{_G}  Switch to Offline mode.{_R}",

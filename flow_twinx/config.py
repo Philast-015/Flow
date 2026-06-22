@@ -34,3 +34,5 @@ Mode = "Online"
 THEME = ONLINE_THEME
 
 liked_music = pathlib.Path.home() / ".flow/liked.txt"
+
+MAX_RESULTS_RADIO = 35

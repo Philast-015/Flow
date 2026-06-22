@@ -20,7 +20,7 @@ def _progress_bar(elapsed, total):
     return f"  [{bar}] {pct}%"
 
 
-def play_entry(entry, title, args=None, filepath=None):
+def play_entry(entry, title, args=None, filepath=None, stop_on_interrupt=False):
     repeat = args and getattr(args, "r", False)
 
     while True:
@@ -60,6 +60,8 @@ def play_entry(entry, title, args=None, filepath=None):
             player.stop()
             sys.stdout.write("\n")
             sys.stdout.flush()
+            if stop_on_interrupt:
+                raise
             break
 
         sys.stdout.write("\n")
