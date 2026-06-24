@@ -9,6 +9,7 @@ DEFAULT_SHORTCUTS = {
     "li": "list",
     "lk": "like",
     "dl": "download",
+    "rd": "radio",
     "sw": "switch",
     "hl": "help",
     "ex": "exit",

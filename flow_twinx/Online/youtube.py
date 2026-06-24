@@ -56,7 +56,8 @@ def fetch_radio(query, max_results=30):
             return []
 
     radio_url = f"https://www.youtube.com/watch?v={video_id}&list=RDMM{video_id}"
-    with yt_dlp.YoutubeDL(ydl_opts_radio) as ydl:
+    opts = {**ydl_opts_radio, "playlistend": max_results}
+    with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(radio_url, download=False)
         entries = info.get("entries", [])
         results = []
@@ -66,7 +67,7 @@ def fetch_radio(query, max_results=30):
             dur = entry.get("duration", 0)
             if vid:
                 results.append((title, vid, dur))
-    return results[:max_results]
+    return results
 
 def get_entry(url):
     with yt_dlp.YoutubeDL(ydl_opts_play) as ydl:

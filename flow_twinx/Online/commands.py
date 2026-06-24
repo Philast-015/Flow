@@ -1,3 +1,4 @@
+import pathlib
 import random
 import sys
 import threading
@@ -188,33 +189,31 @@ def radio(extra, args):
         e("     No radio tracks found")
         return
 
-    _t = config.THEMES[config.THEME]["theme"]
-    print(f"{_t}\n  Radio mix based on \"{query}\":\n")
-    for i, (title, vid, dur) in enumerate(tracks, 1):
-        short = _truncate_title(title)
-        mins, secs = divmod(int(dur), 60)
-        print(f"  {i:2d}. {short:30s} {mins}:{secs:02d}")
+    playlist_dir = None
+    if getattr(args, "d", False):
+        safe = "".join(c if c.isalnum() or c in " -_" else "" for c in query).strip().replace(" ", "_")
+        playlist_dir = pathlib.Path.home() / ".flow" / "music" / "playlist" / safe
+        playlist_dir.mkdir(parents=True, exist_ok=True)
+        m(f"\tDownloading to {playlist_dir}")
 
-    for i, (title, vid, dur) in enumerate(tracks):
-        upcoming = tracks[i + 1:i + 4]
-        if upcoming:
-            print(f"\n  {'─' * 36}")
-            for ut, uv, ud in upcoming:
-                short = _truncate_title(ut)
-                m, s = divmod(int(ud), 60)
-                print(f"\t→ {short:30s} {m}:{s:02d}")
-            print(f"  {'─' * 36}")
-
+    GREEN = "\033[32m"
+    RESET = "\033[0m"
+    for idx, (title, vid, dur) in enumerate(tracks):
         url = f"https://www.youtube.com/watch?v={vid}"
         entry = youtube.get_entry(url)
         short = _truncate_title(title)
         mins, secs = divmod(int(dur), 60)
-        i(f"\tNow Playing: {short}  ({mins}:{secs:02d})")
+
+        if idx + 1 < len(tracks):
+            n_title, n_vid, n_dur = tracks[idx + 1]
+            n_short = _truncate_title(n_title)
+            n_mins, n_secs = divmod(int(n_dur), 60)
+            print(f"{GREEN}\t→ Next: {n_short:30s} {n_mins}:{n_secs:02d}{RESET}")
 
         filepath = None
-        if getattr(args, "d", False):
+        if playlist_dir:
             m(f"\tDownloading {short}...")
-            filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
+            filepath = youtube.download_url(url, str(playlist_dir))
             m(f"\tDownloaded to {filepath}")
 
         try:
