@@ -21,6 +21,7 @@ def _progress_bar(elapsed, total):
 
 
 def play_entry(entry, title, args=None, filepath=None, stop_on_interrupt=False):
+    title = title.split("|")[0]
     repeat = args and getattr(args, "r", False)
 
     while True:
@@ -45,7 +46,7 @@ def play_entry(entry, title, args=None, filepath=None, stop_on_interrupt=False):
 
         duration = entry.get("duration", 0)
         dur_min, dur_sec = divmod(int(duration), 60)
-        i(f"\nPlaying : {title}")
+        i(f"\n>> Now : {title}")
         m(f"    {dur_min}:{dur_sec:02d} | repeat:{args.r} | shuffle:{args.s}")
 
         start = time.time()

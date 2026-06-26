@@ -208,7 +208,7 @@ def radio(extra, args):
             n_title, n_vid, n_dur = tracks[idx + 1]
             n_short = _truncate_title(n_title)
             n_mins, n_secs = divmod(int(n_dur), 60)
-            print(f"{GREEN}\t→ Next: {n_short:30s} {n_mins}:{n_secs:02d}{RESET}")
+            print(f"{GREEN}\t>> Next: {n_short:30s} {n_mins}:{n_secs:02d}{RESET}")
 
         filepath = None
         if playlist_dir:

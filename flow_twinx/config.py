@@ -27,7 +27,7 @@ THEMES = {
 
 DOWNLOAD_DIR = pathlib.Path.home() / ".flow/downloads"
 
-VERSION = 0.1
+VERSION = 0.2
 
 Mode = "Online"
 
