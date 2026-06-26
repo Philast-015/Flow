@@ -10,15 +10,19 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from .imports import config, show_banner, tui_input, is_connected
-from .imports import tprint as tui_print
 from . import shortcuts
+
+P = config.Primary
+S = config.Secondary
+M = config.Muted
+R = config.Reset
 
 
 def _spinner(stop):
     chars = "|/-\\"
     i = 0
     while not stop():
-        sys.stdout.write(f"\r\x1b[36mChecking connection... {chars[i]}\x1b[0m")
+        sys.stdout.write(f"\r{P}Checking connection... {chars[i]}{R}")
         sys.stdout.flush()
         time.sleep(0.1)
         i = (i + 1) % len(chars)
@@ -56,7 +60,7 @@ def main():
     if args.command:
         commands.run(args.command, unknown, args)
     elif unknown:
-        tui_print(color="white", border="double")(f"Unknown argument: {' '.join(unknown)}")
+        print(f"Unknown argument: {' '.join(unknown)}")
     else:
         while True:
             try:
@@ -67,7 +71,7 @@ def main():
                 extra = parts[1:]
                 cmd = shortcuts.resolve(cmd)
                 if cmd in ("exit", "quit", "q"):
-                    tui_print(color="grey", border="none")("Goodbye!")
+                    print(f"{M}Goodbye!{R}")
                     break
                 cmd_args = argparse.Namespace(**vars(args))
                 for flag in ("r", "s", "d"):
@@ -77,9 +81,8 @@ def main():
                     mode = config.Mode
                     commands = _load_commands()
                     show_banner()
-                    tui_print(color="grey", border="none")(f"Mode changed to {mode}")
             except (EOFError, KeyboardInterrupt):
-                tui_print(color="grey", border="none")("\nGoodbye!")
+                print(f"{M}\nGoodbye!{R}")
                 break
 
 

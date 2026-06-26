@@ -1,8 +1,10 @@
-_G = "\033[90m"
-_B = "\033[34m"
-_M = "\033[35m"
-_R = "\033[0m"
-_T = "{theme}"
+from . import config
+
+_T = config.Primary
+_M = config.Tertiary
+_B = config.Secondary
+_G = config.Muted
+_R = config.Reset
 
 ONLINE_HELP = {
     "play": [
@@ -44,7 +46,7 @@ ONLINE_HELP = {
         f"{_T}> radio{_R} {_M}<song_name>{_R}",
         f"{_G}  Generate a radio mix based on a reference song.{_R}",
         f"{_G}  Plays related songs sequentially from YouTube Music.{_R}",
-        f"{_G}  Press Ctrl+C to stop. Alias:{_R} {_M}rd{_R}",
+        f"{_G}  Press Ctrl+C for next track, Ctrl+Q to quit. Alias:{_R} {_M}rd{_R}",
     ],
     "switch": [
         f"{_T}> switch{_R}",

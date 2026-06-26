@@ -1,9 +1,21 @@
 import random
-from ..imports import config, merge_flags, tprint, is_connected
+from ..imports import config, merge_flags, is_connected
 from .. import shortcuts
 from .. import help_detail
 from . import file as lib
 from . import player
+
+P = config.Primary
+S = config.Secondary
+T = config.Tertiary
+M = config.Muted
+E = config.Red
+G = config.Grey
+R = config.Reset
+
+m = lambda t: print(f"{M}{t}{R}")
+e = lambda t: print(f"{E}{t}{R}")
+i = lambda t: print(f"{P if config.Mode == 'Online' else S}{t}{R}")
 
 try:
     import readline
@@ -22,12 +34,9 @@ COMMANDS = {
     "switch":  "Switch to Online mode (checks connection)",
     "help":    "Show this help message",
     "short":   "Show/update command shortcuts",
+    "config":  "Change primary/secondary/tertiary colors",
     "exit":    "Exit Flow",
 }
-
-m = tprint(color="grey", border="none")
-e = tprint(color="red", border="none")
-i = tprint(color="theme", border="none")
 
 
 class _Completer:
@@ -84,6 +93,8 @@ def run(cmd: str, extra: list[str], args):
         show_help(inf)
     elif cmd == "short":
         shortcuts.cmd_short(extra, m)
+    elif cmd == "config":
+        config.cmd_config(extra, args)
     else:
         e(f"Unknown command: {cmd}")
 
@@ -212,23 +223,20 @@ def list_library():
 
 def switch_mode():
     if is_connected():
-        i("Switched to Online mode")
+        pass
     else:
         e("No internet connection")
 
 
 def show_help(inf=False):
-    _t = config.THEMES[config.THEME]["theme"]
-    _g = "\033[90m"
-    _r = "\033[0m"
     if inf:
-        print(f"{_t}Offline Commands (detailed):{_r}")
+        print(f"{T}Offline Commands (detailed):{R}")
         for cmd, lines in help_detail.OFFLINE_HELP.items():
             for line in lines:
-                print(f"  {line.replace('{theme}', _t)}")
+                print(f"  {line}")
             print()
     else:
-        print(f"{_t}Offline Commands:{_r}")
+        print(f"{T}Offline Commands:{R}")
         for cmd, desc in COMMANDS.items():
-            print(f"  {_t}{cmd:12s}{_r} {_g}{desc}{_r}")
-        print(f"{_g}  Use 'help -i' for detailed usage{_r}")
+            print(f"  {T}{cmd:12s}{R} {G}{desc}{R}")
+        print(f"{G}  Use 'help -i' for detailed usage{R}")

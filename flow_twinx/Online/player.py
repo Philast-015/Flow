@@ -1,11 +1,19 @@
 import sys
 import time
 import vlc
-from ..imports import tprint
+from ..imports import config
 
-m = tprint(color="grey", border="none")
-e = tprint(color="red", border="none")
-i = tprint(color="theme", border="none")
+P = config.Primary
+S = config.Secondary
+T = config.Tertiary
+M = config.Muted
+E = config.Red
+R = config.Reset
+
+m = lambda t: print(f"{M}{t}{R}")
+e = lambda t: print(f"{E}{t}{R}")
+i = lambda t: print(f"{P if config.Mode == 'Online' else S}{t}{R}")
+t = lambda t: print(f"{T}{t}{R}")
 
 BAR_WIDTH = 40
 
@@ -20,7 +28,7 @@ def _progress_bar(elapsed, total):
     return f"  [{bar}] {pct}%"
 
 
-def play_entry(entry, title, args=None, filepath=None, stop_on_interrupt=False):
+def play_entry(entry, title, args=None, filepath=None, flags=None):
     title = title.split("|")[0]
     repeat = args and getattr(args, "r", False)
 
@@ -46,27 +54,34 @@ def play_entry(entry, title, args=None, filepath=None, stop_on_interrupt=False):
 
         duration = entry.get("duration", 0)
         dur_min, dur_sec = divmod(int(duration), 60)
-        i(f"\n>> Now : {title}")
+        i(f"\n⤘ Now : {title}")
         m(f"    {dur_min}:{dur_sec:02d} | repeat:{args.r} | shuffle:{args.s}")
 
         start = time.time()
+        skipped = False
         try:
             while player.get_state() not in (vlc.State.Ended, vlc.State.Error):
+                if flags:
+                    if flags.get("quit", lambda: False)():
+                        player.stop()
+                        return
+                    if flags.get("skip", lambda: False)():
+                        skipped = True
+                        player.stop()
+                        break
                 elapsed = time.time() - start
                 bar = _progress_bar(elapsed, duration)
-                sys.stdout.write(f"\r\x1b[36m{bar}\x1b[0m")
+                sys.stdout.write(f"\r{P}{bar}{R}")
                 sys.stdout.flush()
                 time.sleep(0.5)
         except KeyboardInterrupt:
             player.stop()
             sys.stdout.write("\n")
             sys.stdout.flush()
-            if stop_on_interrupt:
-                raise
             break
 
         sys.stdout.write("\n")
         sys.stdout.flush()
 
-        if not repeat:
+        if skipped or not repeat:
             break

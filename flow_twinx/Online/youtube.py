@@ -28,7 +28,7 @@ ydl_opts_play = {
     "noplaylist": True, "format": "bestaudio/best", "skip_download": True,
 }
 
-def search(query, limit=5):
+def search(query, limit=3):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
         if not info.get("entries"):

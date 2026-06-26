@@ -1,11 +1,19 @@
 import sys
 import time
 import vlc
-from ..imports import tprint
+from ..imports import config
 
-m = tprint(color="grey", border="none")
-e = tprint(color="red", border="none")
-i = tprint(color="theme", border="none")
+P = config.Primary
+S = config.Secondary
+T = config.Tertiary
+M = config.Muted
+E = config.Red
+R = config.Reset
+
+m = lambda t: print(f"{M}{t}{R}")
+e = lambda t: print(f"{E}{t}{R}")
+i = lambda t: print(f"{P if config.Mode == 'Online' else S}{t}{R}")
+t = lambda t: print(f"{T}{t}{R}")
 
 BAR_WIDTH = 40
 
@@ -48,7 +56,7 @@ def play_file(filepath, title, args=None):
             while player.get_state() not in (vlc.State.Ended, vlc.State.Error):
                 elapsed = time.time() - start
                 bar = _progress_bar(elapsed, duration)
-                sys.stdout.write(f"\r\x1b[35m{bar}\x1b[0m")
+                sys.stdout.write(f"\r{S}{bar}{R}")
                 sys.stdout.flush()
                 time.sleep(0.5)
         except KeyboardInterrupt:

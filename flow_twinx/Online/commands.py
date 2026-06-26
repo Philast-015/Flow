@@ -1,16 +1,43 @@
 import pathlib
 import random
+import signal
 import sys
+import termios
 import threading
 import time
-from ..imports import config, merge_flags, tprint
+from ..imports import config, merge_flags
 from .. import shortcuts
 from .. import help_detail
 from . import youtube
 from . import player
 
+P = config.Primary
+S = config.Secondary
+T = config.Tertiary
+M = config.Muted
+E = config.Red
+G = config.Grey
+R = config.Reset
+
+m = lambda t: print(f"{M}{t}{R}")
+e = lambda t: print(f"{E}{t}{R}")
+i = lambda t: print(f"{P if config.Mode == 'Online' else S}{t}{R}")
+
 _last_results = []
 _last_played = None
+
+_radio_quit = False
+_radio_skip = False
+
+
+def _radio_sigint(sig, frame):
+    global _radio_skip
+    _radio_skip = True
+
+
+def _radio_sigquit(sig, frame):
+    global _radio_quit
+    _radio_quit = True
 
 COMMANDS = {
     "play":     "Play a song from YouTube",
@@ -21,12 +48,9 @@ COMMANDS = {
     "switch":   "Switch to Offline mode",
     "help":     "Show this help message",
     "short":    "Show/update command shortcuts",
+    "config":   "Change primary/secondary/tertiary colors",
     "exit":     "Exit Flow",
 }
-
-m = tprint(color="grey", border="none")
-e = tprint(color="red", border="none")
-i = tprint(color="theme", border="none")
 
 def run(cmd: str, extra: list[str], args):
     cmd = shortcuts.resolve(cmd)
@@ -48,6 +72,8 @@ def run(cmd: str, extra: list[str], args):
         radio(extra, args)
     elif cmd == "short":
         shortcuts.cmd_short(extra, m)
+    elif cmd == "config":
+        config.cmd_config(extra, args)
     else:
         print(f"Unknown command: {cmd}")
 
@@ -56,7 +82,7 @@ def _spinner(stop):
     chars = "|/-\\"
     i = 0
     while not stop():
-        sys.stdout.write(f"\r\x1b[36mSearching... {chars[i]}\x1b[0m")
+        sys.stdout.write(f"\r{P}Searching... {chars[i]}{R}")
         sys.stdout.flush()
         time.sleep(0.1)
         i = (i + 1) % len(chars)
@@ -196,30 +222,55 @@ def radio(extra, args):
         playlist_dir.mkdir(parents=True, exist_ok=True)
         m(f"\tDownloading to {playlist_dir}")
 
-    GREEN = "\033[32m"
-    RESET = "\033[0m"
-    for idx, (title, vid, dur) in enumerate(tracks):
-        url = f"https://www.youtube.com/watch?v={vid}"
-        entry = youtube.get_entry(url)
-        short = _truncate_title(title)
-        mins, secs = divmod(int(dur), 60)
+    global _radio_quit, _radio_skip
+    _radio_quit = False
+    _radio_skip = False
 
-        if idx + 1 < len(tracks):
-            n_title, n_vid, n_dur = tracks[idx + 1]
-            n_short = _truncate_title(n_title)
-            n_mins, n_secs = divmod(int(n_dur), 60)
-            print(f"{GREEN}\t>> Next: {n_short:30s} {n_mins}:{n_secs:02d}{RESET}")
+    old_sigint = signal.signal(signal.SIGINT, _radio_sigint)
+    old_sigquit = signal.signal(signal.SIGQUIT, _radio_sigquit)
 
-        filepath = None
-        if playlist_dir:
-            m(f"\tDownloading {short}...")
-            filepath = youtube.download_url(url, str(playlist_dir))
-            m(f"\tDownloaded to {filepath}")
+    fd = sys.stdin.fileno()
+    old_term = None
+    try:
+        old_term = termios.tcgetattr(fd)
+        new = termios.tcgetattr(fd)
+        new[0] &= ~termios.IXON
+        new[6][termios.VQUIT] = 0x11  # Ctrl+Q -> SIGQUIT
+        termios.tcsetattr(fd, termios.TCSADRAIN, new)
+    except (termios.error, OSError):
+        pass
 
-        try:
-            player.play_entry(entry, title, args, filepath, stop_on_interrupt=True)
-        except KeyboardInterrupt:
-            break
+    flags = {"quit": lambda: _radio_quit, "skip": lambda: _radio_skip}
+
+    idx = 0
+    try:
+        while idx < len(tracks) and not _radio_quit:
+            title, vid, dur = tracks[idx]
+            url = f"https://www.youtube.com/watch?v={vid}"
+            entry = youtube.get_entry(url)
+            short = _truncate_title(title)
+            mins, secs = divmod(int(dur), 60)
+
+            if idx + 1 < len(tracks):
+                n_title, n_vid, n_dur = tracks[idx + 1]
+                n_short = _truncate_title(n_title)
+                n_mins, n_secs = divmod(int(n_dur), 60)
+                print(f"{T}\n\t⥤ Next: {n_short:30s} {n_mins}:{n_secs:02d}{R}")
+
+            filepath = None
+            if playlist_dir:
+                m(f"\tDownloading {short}...")
+                filepath = youtube.download_url(url, str(playlist_dir))
+                m(f"\tDownloaded to {filepath}")
+
+            _radio_skip = False
+            player.play_entry(entry, title, args, filepath, flags=flags)
+            idx += 1
+    finally:
+        if old_term:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_term)
+        signal.signal(signal.SIGINT, old_sigint)
+        signal.signal(signal.SIGQUIT, old_sigquit)
 
 
 def download(extra: list[str]):
@@ -259,22 +310,17 @@ def download(extra: list[str]):
 
 def switch_mode():
     config.Mode = "Offline"
-    config.THEME = config.OFFLINE_THEME
-    m("Switched to Offline mode")
 
 
 def show_help(inf=False):
-    _t = config.THEMES[config.THEME]["theme"]
-    _g = "\033[90m"
-    _r = "\033[0m"
     if inf:
-        print(f"{_t}Online Commands (detailed):{_r}")
+        print(f"{T}Online Commands (detailed):{R}")
         for cmd, lines in help_detail.ONLINE_HELP.items():
             for line in lines:
-                print(f"  {line.replace('{theme}', _t)}")
+                print(f"  {line}")
             print()
     else:
-        print(f"{_t}Online Commands:{_r}")
+        print(f"{T}Online Commands:{R}")
         for cmd, desc in COMMANDS.items():
-            print(f"  {_t}{cmd:12s}{_r} {_g}{desc}{_r}")
-        print(f"{_g}  Use 'help -i' for detailed usage{_r}")
+            print(f"  {T}{cmd:12s}{R} {G}{desc}{R}")
+        print(f"{G}  Use 'help -i' for detailed usage{R}")

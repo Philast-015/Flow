@@ -12,6 +12,7 @@ DEFAULT_SHORTCUTS = {
     "rd": "radio",
     "sw": "switch",
     "hl": "help",
+    "cf": "config",
     "ex": "exit",
 }
 
