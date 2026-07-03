@@ -21,7 +21,7 @@ A terminal-based music player with online streaming and offline library modes.
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/flow.git
+git clone https://github.com/Philast-015/Flow.git
 cd flow
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
