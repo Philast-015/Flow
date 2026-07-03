@@ -33,7 +33,7 @@ Or through pip:
 pip install flow-twinx
 ```
 
-### Note: Make sure you have python installed
+### Note: Make sure you have python and vlc installed
 
 ## Usage
 
