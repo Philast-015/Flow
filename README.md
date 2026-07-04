@@ -4,7 +4,7 @@ A terminal-based music player with online streaming and offline library modes.
 
 ## Features
 
-- **Dual-mode operation** — Automatically detects internet and switches between online streaming and offline playback
+- **Dual-mode operation** — It will automatically detect internet and switch between online streaming and offline playback.
 - **Online mode** — Search and stream audio from YouTube via `yt-dlp` and `python-vlc`
 - **Offline mode** — Play local audio files with album support, search, and a liked-songs collection
 - **Download** — Save tracks from YouTube to your local library with the `-d` flag
@@ -23,8 +23,7 @@ A terminal-based music player with online streaming and offline library modes.
 ```bash
 git clone https://github.com/Philast-015/Flow.git
 cd flow
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
+uv run flow_twinx/main.py
 ```
 
 Or through pip:
@@ -33,19 +32,17 @@ Or through pip:
 pip install flow-twinx
 ```
 
-### Note: Make sure you have python and vlc installed
+### Note: Make sure you vlc installed or it will not play music.
 
 ## Usage
 
 ```bash
 cd flow_twinx
-python main.py [-r] [-s] [-d]
+uv run main.py
 ```
-
 Or direct if you have used pypi
-
 ```bash
-flow <command> <flag>
+flow
 ```
 
 | Flag | Description                                    |
@@ -53,6 +50,7 @@ flow <command> <flag>
 | `-r` | Repeat mode (loop current track)               |
 | `-s` | Shuffle mode (random order)                    |
 | `-d` | Download mode (save streamed audio to library) |
+| `-i` | Use it in help command to show detailed help   |
 
 ### Commands
 
@@ -65,6 +63,7 @@ flow <command> <flag>
 | `download <name or #>` | Save a streamed song to the local library    |
 | `switch`               | Toggle between online and offline mode       |
 | `help`                 | Show available commands                      |
+| `help -i`                 | Show available commands with detailed explanation                      |
 
 ## Configuration
 
@@ -76,29 +75,28 @@ flow <command> <flag>
 
 ```
 flow/
-├── flow_twinx/                 # Main application package
+├── flow_twinx/
 │   ├── __init__.py
-│   ├── config.py               # Configuration, themes, paths
-│   ├── imports.py              # Central import hub
-│   ├── main.py                 # Entry point / CLI
-│   ├── ping.py                 # Connection checker
-│   ├── tui.py                  # Terminal UI helpers (colors, banner, input)
-│   ├── Online/                 # Online streaming mode
+│   ├── config.py               
+│   ├── imports.py              
+│   ├── main.py                 
+│   ├── ping.py                 
+│   ├── tui.py                  
+│   ├── Online/
 │   │   ├── __init__.py
-│   │   ├── commands.py         # Online command handlers
-│   │   ├── player.py           # VLC-based stream player
-│   │   └── youtube.py          # YouTube search & download via yt-dlp
-│   └── Offline/                # Offline local library mode
+│   │   ├── commands.py         
+│   │   ├── player.py           
+│   │   └── youtube.py
+│   └── Offline/                
 │       ├── __init__.py
-│       ├── commands.py         # Offline command handlers
-│       ├── file.py             # Local file & library management
-│       ├── player.py           # VLC-based local file player
-│       └── youtube.py          # Placeholder
-├── pyproject.toml              # Package metadata & build config
-├── requirements.txt            # Dependencies (python-vlc, yt_dlp)
+│       ├── commands.py         
+│       ├── file.py             
+│       ├── player.py           
+│       └── youtube.py         
+├── pyproject.toml
 └── README.md
 ```
 
 ## License
 
-MIT
+Use however you want just mention me for inspiration.

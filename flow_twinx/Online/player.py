@@ -28,6 +28,41 @@ def _progress_bar(elapsed, total):
     return f"  [{bar}] {pct}%"
 
 
+def play_url(url, title, args=None, duration=0):
+    repeat = args and getattr(args, "r", False)
+
+    while True:
+        instance = vlc.Instance("--no-video --quiet")
+        player = instance.media_player_new()
+        media = instance.media_new(url)
+        player.set_media(media)
+        player.play()
+
+        dur_min, dur_sec = divmod(int(duration), 60)
+        i(f"\n⤘ Now : {title}")
+        m(f"    {dur_min}:{dur_sec:02d} | repeat:{repeat}")
+
+        start = time.time()
+        try:
+            while player.get_state() not in (vlc.State.Ended, vlc.State.Error):
+                elapsed = time.time() - start
+                bar = _progress_bar(elapsed, duration)
+                sys.stdout.write(f"\r{P}{bar}{R}")
+                sys.stdout.flush()
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            player.stop()
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            break
+
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+        if not repeat:
+            break
+
+
 def play_entry(entry, title, args=None, filepath=None, flags=None):
     title = title.split("|")[0]
     repeat = args and getattr(args, "r", False)

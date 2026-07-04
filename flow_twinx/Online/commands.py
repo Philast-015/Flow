@@ -10,6 +10,7 @@ from .. import shortcuts
 from .. import help_detail
 from . import youtube
 from . import player
+from . import savan
 
 P = config.Primary
 S = config.Secondary
@@ -42,6 +43,8 @@ def _radio_sigquit(sig, frame):
 COMMANDS = {
     "play":     "Play a song from YouTube",
     "search":   "Search YouTube for tracks",
+    "savan":    "Play a song from JioSaavn (alias: svn)",
+    "savan-s":  "Search JioSaavn for tracks (alias: svn-s)",
     "radio":    "Generate a radio mix from a reference song",
     "like":     "Like a song",
     "download": "Download audio from YouTube",
@@ -60,6 +63,10 @@ def run(cmd: str, extra: list[str], args):
         play(extra, args)
     elif cmd == "search":
         search(" ".join(extra) if extra else "")
+    elif cmd in ("savan", "svn"):
+        savan_cmd(extra, args)
+    elif cmd in ("savan-s", "svn-s"):
+        savan_search(" ".join(extra) if extra else "")
     elif cmd == "like":
         like_track()
     elif cmd == "download":
@@ -159,6 +166,75 @@ def _play_liked(args):
         entry, _, _ = _last_results[0]
         _last_played = (entry, title)
         player.play_entry(entry, title, args)
+
+_savan_results = []
+
+
+def savan_cmd(extra, args):
+    global _savan_results, _last_played
+    arg = " ".join(extra) if extra else None
+    if not arg:
+        e("No song specified")
+        return
+
+    if arg.isdigit():
+        idx = int(arg) - 1
+        if idx < 0 or idx >= len(_savan_results):
+            e("Index out of range")
+            return
+        entry, title, dur = _savan_results[idx]
+    else:
+        stop = False
+        t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
+        t.start()
+        _savan_results = savan.search(arg)
+        stop = True
+        t.join()
+        if not _savan_results:
+            e("No results found")
+            return
+        entry, title, dur = _savan_results[0]
+
+    url = savan.best_url(entry)
+    if not url:
+        e("No playable URL found")
+        return
+
+    if getattr(args, "d", False):
+        safe = "".join(c if c.isalnum() or c in " -_" else "" for c in title).strip()
+        dest = config.DOWNLOAD_DIR / f"{safe}.mp4"
+        config.DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        m(f"\n   Downloading {title}...")
+        try:
+            savan.download(url, str(dest))
+        except Exception as ex:
+            e(f"Download failed: {ex}")
+            return
+        i(f"   Downloaded: {title} -> {dest}")
+        return
+
+    _last_played = (entry, title)
+    player.play_url(url, title, args, dur)
+
+
+def savan_search(query):
+    global _savan_results
+    if not query:
+        e("Search query required")
+        return
+    stop = False
+    t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
+    t.start()
+    _savan_results = savan.search(query)
+    stop = True
+    t.join()
+    if not _savan_results:
+        e("No results found")
+        return
+    for i, (_, title, dur) in enumerate(_savan_results, 1):
+        mins, secs = divmod(int(dur), 60)
+        m(f"  {i}. {title}  ({mins}:{secs:02d})")
+
 
 def like_track():
     global _last_played

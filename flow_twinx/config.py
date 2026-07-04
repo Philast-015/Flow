@@ -3,8 +3,9 @@ import pathlib
 
 CONFIG_FILE = pathlib.Path.home() / ".flow/config.json"
 
+
 def merge_flags(extra: list[str], args) -> tuple[list[str], object]:
-    mapping = {"-r": "r", "-s": "s", "-d": "d" , "-i":"i" , "-h":"h"}
+    mapping = {"-r": "r", "-s": "s", "-d": "d", "-i": "i", "-h": "h"}
     rest = []
     for item in extra:
         if item in mapping:
@@ -15,6 +16,7 @@ def merge_flags(extra: list[str], args) -> tuple[list[str], object]:
             rest.append(item)
     return rest, args
 
+
 Red = "\033[0;31m"
 Green = "\033[0;32m"
 Brown = "\033[0;33m"
@@ -24,28 +26,31 @@ Cyan = "\033[0;36m"
 Grey = "\033[90m"
 YELLOW = "\033[1;33m"
 White = "\033[1;37m"
-MAROON   = "\033[38;5;124m"
-OLIVE    = "\033[38;5;100m"
+MAROON = "\033[38;5;124m"
+OLIVE = "\033[38;5;100m"
 DARK_KHAKI = "\033[38;5;136m"
-GOLD     = "\033[38;5;220m"
-TAN      = "\033[38;5;215m"
-SALMON   = "\033[38;5;209m"
-CORAL     = "\033[38;5;203m"
-HOT_PINK  = "\033[38;5;205m"
-VIOLET    = "\033[38;5;141m"
+GOLD = "\033[38;5;220m"
+TAN = "\033[38;5;215m"
+SALMON = "\033[38;5;209m"
+CORAL = "\033[38;5;203m"
+HOT_PINK = "\033[38;5;205m"
+VIOLET = "\033[38;5;141m"
 DEEP_PURPLE = "\033[38;5;129m"
-TEAL      = "\033[38;5;30m"
-SKY_BLUE  = "\033[38;5;117m"
+TEAL = "\033[38;5;30m"
+SKY_BLUE = "\033[38;5;117m"
 STEEL_BLUE = "\033[38;5;67m"
-NAVY      = "\033[38;5;18m"
-INDIGO    = "\033[38;5;54m"
-ORANGE   = "\033[38;5;202m"  
-PINK      = "\033[38;5;205m" 
-LIME      = "\033[38;5;154m"
+NAVY = "\033[38;5;18m"
+INDIGO = "\033[38;5;54m"
+ORANGE = "\033[38;5;202m"
+PINK = "\033[38;5;205m"
+LIME = "\033[38;5;154m"
 Reset = "\033[0m"
 
-_COLORS = {k.lower().replace("_", ""): v for k, v in vars().items()
-           if isinstance(v, str) and v.startswith("\033") and k != "Reset"}
+_COLORS = {
+    k.lower().replace("_", ""): v
+    for k, v in vars().items()
+    if isinstance(v, str) and v.startswith("\033") and k != "Reset"
+}
 
 _COLOR_NAMES = {v: k for k, v in _COLORS.items()}
 
@@ -83,6 +88,7 @@ def _save_config():
     }
     CONFIG_FILE.write_text(json.dumps(data, indent=2))
 
+
 DOWNLOAD_DIR = pathlib.Path.home() / ".flow/downloads"
 
 VERSION = 0.3
@@ -116,7 +122,9 @@ def cmd_config(extra: list[str], args=None):
     target = _TARGET_ALIASES.get(extra[0].lower(), extra[0].lower())
     color_name = extra[1].lower()
     if color_name not in _COLORS:
-        print(f"Unknown color '{color_name}'. Use 'config -h' to see available colors.{Reset}")
+        print(
+            f"Unknown color '{color_name}'. Use 'config -h' to see available colors.{Reset}"
+        )
         return
     if target == "primary":
         Primary = _COLORS[color_name]

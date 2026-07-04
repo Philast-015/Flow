@@ -14,6 +14,8 @@ DEFAULT_SHORTCUTS = {
     "hl": "help",
     "cf": "config",
     "ex": "exit",
+    "svn": "savan",
+    "svn-s": "savan-s",
 }
 
 _shortcuts = {}

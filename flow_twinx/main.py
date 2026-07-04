@@ -34,7 +34,27 @@ def _load_commands():
     return importlib.import_module(f".{config.Mode}.commands", package=__package__)
 
 
+def _check_vlc():
+    try:
+        import vlc
+    except ImportError:
+        print(
+            f"{config.Red}VLC is not installed. Flow requires VLC to play audio.{config.Reset}\n"
+            f"{config.Muted}Install it with:{config.Reset}\n"
+            f"  {config.Tertiary}sudo apt install vlc{config.Reset}"
+            f"  {config.Muted}  # Debian/Ubuntu{config.Reset}\n"
+            f"  {config.Tertiary}sudo dnf install vlc{config.Reset}"
+            f"  {config.Muted}  # Fedora{config.Reset}\n"
+            f"  {config.Tertiary}sudo pacman -S vlc{config.Reset}"
+            f"  {config.Muted}  # Arch Linux{config.Reset}\n"
+            f"  {config.Tertiary}brew install vlc{config.Reset}"
+            f"  {config.Muted}  # macOS{config.Reset}"
+        )
+        sys.exit(1)
+
+
 def main():
+    _check_vlc()
     stop = False
     t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
     t.start()
