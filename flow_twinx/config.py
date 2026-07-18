@@ -5,7 +5,7 @@ CONFIG_FILE = pathlib.Path.home() / ".flow/config.json"
 
 
 def merge_flags(extra: list[str], args) -> tuple[list[str], object]:
-    mapping = {"-r": "r", "-s": "s", "-d": "d", "-i": "i", "-h": "h"}
+    mapping = {"-bg": "bg"}
     rest = []
     for item in extra:
         if item in mapping:
@@ -99,10 +99,44 @@ liked_music = pathlib.Path.home() / ".flow/liked.txt"
 
 MAX_RESULTS_RADIO = 35
 
+PID_FILE = pathlib.Path.home() / ".flow/vlc.pid"
+
+
+def save_pid(pid: int):
+    PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PID_FILE.write_text(str(pid))
+
+
+def read_pid() -> int | None:
+    if not PID_FILE.exists():
+        return None
+    try:
+        return int(PID_FILE.read_text().strip())
+    except (ValueError, OSError):
+        return None
+
+
+def clear_pid():
+    if PID_FILE.exists():
+        PID_FILE.unlink()
+
+
+def kill_stored():
+    import os, signal
+    pid = read_pid()
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    clear_pid()
+    return True
+
 
 def cmd_config(extra: list[str], args=None):
     global Primary, Secondary, Tertiary
-    if (args and getattr(args, "h", False)) or (extra and extra[0] == "-h"):
+    if extra and extra[0] == "help":
         print(f"{Tertiary}Available targets:{Reset}")
         print(f"  {Primary}primary{Reset}   (aliases: pri)")
         print(f"  {Secondary}secondary{Reset} (aliases: sec)")

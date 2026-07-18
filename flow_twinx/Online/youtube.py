@@ -1,32 +1,40 @@
 import yt_dlp
 
+BASE_OPTS = {
+    "quiet": True,
+    "no_warnings": True,
+    "noprogress": True,
+    "noplaylist": True,
+    "format": "bestaudio/best",
+    "skip_download": True,
+}
+
 ydl_opts = {
-    "quiet": True, "no_warnings": True, "noprogress": True,
-    "noplaylist": True, "format": "bestaudio/best",
-    "default_search": "ytsearch1", "skip_download": True,
+    **BASE_OPTS,
+    "default_search": "ytsearch1",
 }
 
 ydl_opts_dwn = {
-    "quiet": True, "no_warnings": True, "noprogress": True,
-    "noplaylist": True, "format": "bestaudio/best",
+    **BASE_OPTS,
+    "skip_download": False,
     "outtmpl": "downloads/%(title)s.%(ext)s",
 }
 
 ydl_opts_search = {
-    "quiet": True, "no_warnings": True, "noprogress": True,
-    "noplaylist": True, "format": "bestaudio/best",
-    "default_search": "ytsearch1", "skip_download": True,
+    **BASE_OPTS,
+    "default_search": "ytsearch1",
 }
 
 ydl_opts_radio = {
-    "quiet": True, "no_warnings": True, "noprogress": True,
-    "noplaylist": False, "extract_flat": True, "skip_download": True,
+    **BASE_OPTS,
+    "noplaylist": False,
+    "extract_flat": True,
 }
 
 ydl_opts_play = {
-    "quiet": True, "no_warnings": True, "noprogress": True,
-    "noplaylist": True, "format": "bestaudio/best", "skip_download": True,
+    **BASE_OPTS,
 }
+
 
 def search(query, limit=3):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -40,11 +48,13 @@ def search(query, limit=3):
             results.append((entry, title, dur))
     return results
 
+
 def download_url(url, outdir):
     opts = {**ydl_opts_dwn, "outtmpl": f"{outdir}/%(title)s.%(ext)s"}
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
         return ydl.prepare_filename(info)
+
 
 def fetch_radio(query, max_results=30):
     with yt_dlp.YoutubeDL(ydl_opts_search) as ydl:
@@ -68,6 +78,7 @@ def fetch_radio(query, max_results=30):
             if vid:
                 results.append((title, vid, dur))
     return results
+
 
 def get_entry(url):
     with yt_dlp.YoutubeDL(ydl_opts_play) as ydl:

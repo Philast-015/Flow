@@ -13,11 +13,11 @@ ONLINE_HELP = {
         f"  {_M}<query>{_R}   {_G}Search YouTube and play the top result{_R}",
         f"  {_M}<index>{_R}   {_G}Play a song by index from last search results{_R}",
         f"  {_M}liked{_R}     {_G}Play all liked songs{_R}",
-        f"  {_M}Flags:{_R} {_G}{_M}-r{_R} {_G}repeat |{_R} {_M}-s{_R} {_G}shuffle |{_R} {_M}-d{_R} {_G}download{_R}",
+        f"  {_M}Flags:{_R} {_G}{_M}-bg{_R} {_G}background{_R}",
         f"  {_G}Examples:{_R}",
         f"    {_G}play never gonna give you up{_R}",
         f"    {_G}play 3{_R}",
-        f"    {_G}play liked{_R} {_M}-s{_R}",
+        f"    {_G}play liked{_R}",
     ],
     "search": [
         f"{_T}> search{_R} {_M}<query>{_R}",
@@ -47,12 +47,11 @@ ONLINE_HELP = {
         f"{_G}  Search and play a song from JioSaavn.{_R}",
         f"  {_M}<query>{_R}   {_G}Search JioSaavn and play the top result{_R}",
         f"  {_M}<index>{_R}   {_G}Play song by index from last savan-s results{_R}",
-        f"  {_M}Flags:{_R} {_G}{_M}-r{_R} {_G}repeat |{_R} {_M}-d{_R} {_G}download{_R}",
+        f"  {_M}Flags:{_R} {_G}{_M}-bg{_R} {_G}background{_R}",
         f"  {_G}Alias:{_R} {_M}svn{_R}",
         f"  {_G}Examples:{_R}",
         f"    {_G}savan hello{_R}",
         f"    {_G}savan 2{_R}",
-        f"    {_G}savan -d hello{_R}",
     ],
     "savan-s": [
         f"{_T}> savan-s{_R} {_M}<query>{_R}",
@@ -63,10 +62,15 @@ ONLINE_HELP = {
         f"    {_G}savan-s daft punk{_R}",
     ],
     "radio": [
-        f"{_T}> radio{_R} {_M}<song_name>{_R}",
+        f"{_T}> radio{_R} {_M}<song_name> [index]{_R}",
         f"{_G}  Generate a radio mix based on a reference song.{_R}",
-        f"{_G}  Plays related songs sequentially from YouTube Music.{_R}",
+        f"  {_M}<song_name>{_R}  {_G}Search and play a radio mix from YouTube{_R}",
+        f"  {_M}[index]{_R}       {_G}Play a specific track from the last radio list{_R}",
+        f"  {_M}Flags:{_R} {_G}{_M}-bg{_R} {_G}background{_R}",
         f"{_G}  Press Ctrl+C for next track, Ctrl+Q to quit. Alias:{_R} {_M}rd{_R}",
+        f"  {_G}Examples:{_R}",
+        f"    {_G}radio daft punk{_R}",
+        f"    {_G}radio 5{_R}",
     ],
     "switch": [
         f"{_T}> switch{_R}",
@@ -74,9 +78,8 @@ ONLINE_HELP = {
         f"{_G}  Requires an active internet connection.{_R}",
     ],
     "help": [
-        f"{_T}> help{_R} {_M}[-i]{_R}",
+        f"{_T}> help{_R}",
         f"{_G}  Show this help message.{_R}",
-        f"  {_M}-i{_R}     {_G}Show detailed usage for all commands.{_R}",
     ],
     "short": [
         f"{_T}> short{_R} {_M}[index] [new_command]{_R}",
@@ -94,6 +97,11 @@ ONLINE_HELP = {
         f"{_G}  Exit Flow Music Player.{_R}",
         f"{_G}  Aliases:{_R} {_M}quit{_R}, {_M}q{_R}",
     ],
+    "stop": [
+        f"{_T}> flow --stop{_R}",
+        f"{_G}  Stop all background VLC processes.{_R}",
+        f"{_G}  Use from shell: {_M}flow --stop{_R}",
+    ],
 }
 
 OFFLINE_HELP = {
@@ -105,11 +113,11 @@ OFFLINE_HELP = {
         f"  {_B}all{_R}       {_G}Play all songs in the library{_R}",
         f"  {_B}liked{_R}     {_G}Play all liked songs{_R}",
         f"  {_B}<album>{_R}   {_G}Play all songs in a specific album{_R}",
-        f"  {_B}Flags:{_R} {_G}{_B}-r{_R} {_G}repeat |{_R} {_B}-s{_R} {_G}shuffle{_R}",
+        f"  {_B}Flags:{_R} {_G}{_B}-bg{_R} {_G}background{_R}",
         f"  {_G}Examples:{_R}",
         f"    {_G}play never gonna{_R}",
         f"    {_G}play 2{_R}",
-        f"    {_G}play all{_R} {_B}-s{_R}",
+        f"    {_G}play all{_R}",
         f"    {_G}play liked{_R}",
         f"    {_G}play Greatest Hits{_R}",
     ],
@@ -137,9 +145,8 @@ OFFLINE_HELP = {
         f"{_G}  Requires an active internet connection.{_R}",
     ],
     "help": [
-        f"{_T}> help{_R} {_B}[-i]{_R}",
+        f"{_T}> help{_R}",
         f"{_G}  Show this help message.{_R}",
-        f"  {_B}-i{_R}     {_G}Show detailed usage for all commands.{_R}",
     ],
     "short": [
         f"{_T}> short{_R} {_B}[index] [new_command]{_R}",
@@ -156,5 +163,10 @@ OFFLINE_HELP = {
         f"{_T}> exit{_R}",
         f"{_G}  Exit Flow Music Player.{_R}",
         f"{_G}  Aliases:{_R} {_B}quit{_R}, {_B}q{_R}",
+    ],
+    "stop": [
+        f"{_T}> flow --stop{_R}",
+        f"{_G}  Stop all background VLC processes.{_R}",
+        f"{_G}  Use from shell: {_B}flow --stop{_R}",
     ],
 }

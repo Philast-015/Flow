@@ -1,7 +1,6 @@
-import random
+import os
 from ..imports import config, merge_flags, is_connected
 from .. import shortcuts
-from .. import help_detail
 from . import file as lib
 from . import player
 
@@ -16,6 +15,20 @@ R = config.Reset
 m = lambda t: print(f"{M}{t}{R}")
 e = lambda t: print(f"{E}{t}{R}")
 i = lambda t: print(f"{P if config.Mode == 'Online' else S}{t}{R}")
+
+
+def _fork_bg(label):
+    config.kill_stored()
+    pid = os.fork()
+    if pid > 0:
+        config.save_pid(pid)
+        i(f"{label} in background (PID: {pid})")
+        return False
+    devnull = os.open(os.devnull, os.O_RDWR)
+    os.dup2(devnull, 0)
+    os.dup2(devnull, 1)
+    os.dup2(devnull, 2)
+    return True
 
 try:
     import readline
@@ -77,7 +90,6 @@ def _setup_completion():
 def run(cmd: str, extra: list[str], args):
     _setup_completion()
     cmd = shortcuts.resolve(cmd)
-    inf = "-i" in extra
     extra, args = merge_flags(extra, args)
     if cmd == "play":
         play(extra, args)
@@ -90,7 +102,7 @@ def run(cmd: str, extra: list[str], args):
     elif cmd == "switch":
         switch_mode()
     elif cmd == "help":
-        show_help(inf)
+        show_help()
     elif cmd == "short":
         shortcuts.cmd_short(extra, m)
     elif cmd == "config":
@@ -137,38 +149,47 @@ def play(extra: list[str], args):
             return
 
     _last_played = song_path
+    if getattr(args, "bg", False):
+        if not _fork_bg("Now playing"):
+            return
     player.play_file(song_path, song_path.stem, args)
 
 
 def _play_liked(args):
+    global _last_played
     liked = lib.get_liked_songs()
     if not liked:
         e("No liked songs yet")
         return
-    if getattr(args, "s", False):
-        random.shuffle(liked)
+    if getattr(args, "bg", False):
+        if not _fork_bg("Playing liked songs"):
+            return
     for song in liked:
         _last_played = song
         player.play_file(song, song.stem, args)
 
 def _play_all(args):
-    all = lib.get_all_songs()
-    if not all:
+    global _last_played
+    all_songs = lib.get_all_songs()
+    if not all_songs:
         e("No downloaded songs yet")
         return
-    if getattr(args, "s", False):
-        random.shuffle(all)
-    for song in all:
+    if getattr(args, "bg", False):
+        if not _fork_bg("Playing all songs"):
+            return
+    for song in all_songs:
         _last_played = song
         player.play_file(song, song.stem, args)
 
 def _play_album(album: str, args):
+    global _last_played
     songs = lib.get_album_songs(album)
     if not songs:
         e(f"No songs found in album '{album}'")
         return
-    if getattr(args, "s", False):
-        random.shuffle(songs)
+    if getattr(args, "bg", False):
+        if not _fork_bg(f"Playing album: {album}"):
+            return
     for song in songs:
         _last_played = song
         player.play_file(song, song.stem, args)
@@ -223,20 +244,12 @@ def list_library():
 
 def switch_mode():
     if is_connected():
-        pass
+        config.Mode = "Online"
     else:
         e("No internet connection")
 
 
-def show_help(inf=False):
-    if inf:
-        print(f"{T}Offline Commands (detailed):{R}")
-        for cmd, lines in help_detail.OFFLINE_HELP.items():
-            for line in lines:
-                print(f"  {line}")
-            print()
-    else:
-        print(f"{T}Offline Commands:{R}")
-        for cmd, desc in COMMANDS.items():
-            print(f"  {T}{cmd:12s}{R} {G}{desc}{R}")
-        print(f"{G}  Use 'help -i' for detailed usage{R}")
+def show_help():
+    print(f"{T}Offline Commands:{R}")
+    for cmd, desc in COMMANDS.items():
+        print(f"  {T}{cmd:12s}{R} {G}{desc}{R}")

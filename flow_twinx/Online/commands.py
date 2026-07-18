@@ -1,16 +1,13 @@
-import pathlib
-import random
+import os
 import signal
 import sys
 import termios
 import threading
 import time
-from ..imports import config, merge_flags
+
 from .. import shortcuts
-from .. import help_detail
-from . import youtube
-from . import player
-from . import savan
+from ..imports import config, merge_flags
+from . import player, savan, youtube
 
 P = config.Primary
 S = config.Secondary
@@ -29,6 +26,7 @@ _last_played = None
 
 _radio_quit = False
 _radio_skip = False
+_radio_tracks = []
 
 
 def _radio_sigint(sig, frame):
@@ -40,24 +38,39 @@ def _radio_sigquit(sig, frame):
     global _radio_quit
     _radio_quit = True
 
+
+def _fork_bg(label):
+    config.kill_stored()
+    pid = os.fork()
+    if pid > 0:
+        config.save_pid(pid)
+        i(f"{label} in background (PID: {pid})")
+        return False
+    devnull = os.open(os.devnull, os.O_RDWR)
+    os.dup2(devnull, 0)
+    os.dup2(devnull, 1)
+    os.dup2(devnull, 2)
+    return True
+
+
 COMMANDS = {
-    "play":     "Play a song from YouTube",
-    "search":   "Search YouTube for tracks",
-    "savan":    "Play a song from JioSaavn (alias: svn)",
-    "savan-s":  "Search JioSaavn for tracks (alias: svn-s)",
-    "radio":    "Generate a radio mix from a reference song",
-    "like":     "Like a song",
+    "play": "Play a song from YouTube",
+    "search": "Search YouTube for tracks",
+    "savan": "Play a song from JioSaavn (alias: svn)",
+    "savan-s": "Search JioSaavn for tracks (alias: svn-s)",
+    "radio": "Generate a radio mix | radio <song> [index] to play specific track",
+    "like": "Like a song",
     "download": "Download audio from YouTube",
-    "switch":   "Switch to Offline mode",
-    "help":     "Show this help message",
-    "short":    "Show/update command shortcuts",
-    "config":   "Change primary/secondary/tertiary colors",
-    "exit":     "Exit Flow",
+    "switch": "Switch to Offline mode",
+    "help": "Show this help message",
+    "short": "Show/update command shortcuts",
+    "config": "Change primary/secondary/tertiary colors",
+    "exit": "Exit Flow",
 }
+
 
 def run(cmd: str, extra: list[str], args):
     cmd = shortcuts.resolve(cmd)
-    inf = "-i" in extra
     extra, args = merge_flags(extra, args)
     if cmd == "play":
         play(extra, args)
@@ -74,7 +87,7 @@ def run(cmd: str, extra: list[str], args):
     elif cmd == "switch":
         switch_mode()
     elif cmd == "help":
-        show_help(inf)
+        show_help()
     elif cmd in ("radio", "rd"):
         radio(extra, args)
     elif cmd == "short":
@@ -108,6 +121,8 @@ def _do_search(query):
 
 
 def play(extra: list[str], args):
+    if config.kill_stored():
+        print(f"{P}Stopped VLC{R}")
     global _last_results, _last_played
     arg = " ".join(extra) if extra else None
     if not arg:
@@ -132,17 +147,11 @@ def play(extra: list[str], args):
         entry, title, _ = _last_results[0]
 
     _last_played = (entry, title)
-    filepath = None
-    if getattr(args, "d", False):
-        url = entry.get("webpage_url") or entry.get("original_url")
-        if not url:
-            print("No URL found for this entry")
-            return
-        m(f"   \n Downloading {title}...")
-        filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
-        m(f"    Downloaded to {filepath}")
 
-    player.play_entry(entry, title, args, filepath)
+    if getattr(args, "bg", False):
+        if not _fork_bg("Now playing"):
+            return
+    player.play_entry(entry, title, args)
 
 
 def _play_liked(args):
@@ -153,8 +162,6 @@ def _play_liked(args):
     if not liked:
         e("     No liked songs yet")
         return
-    if getattr(args, "s", False):
-        random.shuffle(liked)
     for line in liked:
         if "|" not in line:
             continue
@@ -167,10 +174,13 @@ def _play_liked(args):
         _last_played = (entry, title)
         player.play_entry(entry, title, args)
 
+
 _savan_results = []
 
 
 def savan_cmd(extra, args):
+    if config.kill_stored():
+        print(f"{P}Stopped VLC{R}")
     global _savan_results, _last_played
     arg = " ".join(extra) if extra else None
     if not arg:
@@ -200,20 +210,10 @@ def savan_cmd(extra, args):
         e("No playable URL found")
         return
 
-    if getattr(args, "d", False):
-        safe = "".join(c if c.isalnum() or c in " -_" else "" for c in title).strip()
-        dest = config.DOWNLOAD_DIR / f"{safe}.mp4"
-        config.DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        m(f"\n   Downloading {title}...")
-        try:
-            savan.download(url, str(dest))
-        except Exception as ex:
-            e(f"Download failed: {ex}")
-            return
-        i(f"   Downloaded: {title} -> {dest}")
-        return
-
     _last_played = (entry, title)
+    if getattr(args, "bg", False):
+        if not _fork_bg("Now playing"):
+            return
     player.play_url(url, title, args, dur)
 
 
@@ -247,7 +247,11 @@ def like_track():
         e("     No URL for current song")
         return
     config.liked_music.parent.mkdir(parents=True, exist_ok=True)
-    existing = config.liked_music.read_text().strip().splitlines() if config.liked_music.exists() else []
+    existing = (
+        config.liked_music.read_text().strip().splitlines()
+        if config.liked_music.exists()
+        else []
+    )
     if any(title in line for line in existing):
         m(f"    {title} already liked")
         return
@@ -269,15 +273,52 @@ def search(query: str):
         mins, secs = divmod(int(dur), 60)
         m(f"  {i}. {title}  ({mins}:{secs:02d})")
 
+
 def _truncate_title(title):
     words = title.split()
     return " ".join(words[:3]) if len(words) > 3 else title
 
 
 def radio(extra, args):
+    if config.kill_stored():
+        print(f"{P}Stopped VLC{R}")
+    global _radio_tracks
     query = " ".join(extra) if extra else None
     if not query:
-        e("     Usage: radio <song_name>")
+        e("     Usage: radio <song_name> [index]")
+        return
+
+    parts = query.rsplit(" ", 1)
+    if len(parts) == 1 and parts[0].isdigit():
+        idx = int(parts[0]) - 1
+        if _radio_tracks and 0 <= idx < len(_radio_tracks):
+            title, vid, dur = _radio_tracks[idx]
+            url = f"https://www.youtube.com/watch?v={vid}"
+            entry = youtube.get_entry(url)
+            if getattr(args, "bg", False):
+                if not _fork_bg("Now playing"):
+                    return
+            player.play_entry(entry, title, args)
+            return
+        if _last_results and 0 <= idx < len(_last_results):
+            entry, title, _ = _last_results[idx]
+            query = title
+        else:
+            e("     Index out of range or no results loaded")
+            return
+    elif len(parts) > 1 and parts[-1].isdigit():
+        idx = int(parts[-1]) - 1
+        query = parts[0]
+        if _radio_tracks and 0 <= idx < len(_radio_tracks):
+            title, vid, dur = _radio_tracks[idx]
+            url = f"https://www.youtube.com/watch?v={vid}"
+            entry = youtube.get_entry(url)
+            if getattr(args, "bg", False):
+                if not _fork_bg("Now playing"):
+                    return
+            player.play_entry(entry, title, args)
+            return
+        e("     Index out of range or no radio loaded")
         return
 
     stop = False
@@ -291,16 +332,15 @@ def radio(extra, args):
         e("     No radio tracks found")
         return
 
-    playlist_dir = None
-    if getattr(args, "d", False):
-        safe = "".join(c if c.isalnum() or c in " -_" else "" for c in query).strip().replace(" ", "_")
-        playlist_dir = pathlib.Path.home() / ".flow" / "music" / "playlist" / safe
-        playlist_dir.mkdir(parents=True, exist_ok=True)
-        m(f"\tDownloading to {playlist_dir}")
+    _radio_tracks = tracks
 
     global _radio_quit, _radio_skip
     _radio_quit = False
     _radio_skip = False
+
+    if getattr(args, "bg", False):
+        if not _fork_bg(f"Playing {len(_radio_tracks)} tracks"):
+            return
 
     old_sigint = signal.signal(signal.SIGINT, _radio_sigint)
     old_sigquit = signal.signal(signal.SIGQUIT, _radio_sigquit)
@@ -320,30 +360,24 @@ def radio(extra, args):
 
     idx = 0
     try:
-        while idx < len(tracks) and not _radio_quit:
-            title, vid, dur = tracks[idx]
+        while idx < len(_radio_tracks) and not _radio_quit:
+            title, vid, dur = _radio_tracks[idx]
             url = f"https://www.youtube.com/watch?v={vid}"
             entry = youtube.get_entry(url)
             short = _truncate_title(title)
             mins, secs = divmod(int(dur), 60)
 
-            if idx + 1 < len(tracks):
-                n_title, n_vid, n_dur = tracks[idx + 1]
+            if idx + 1 < len(_radio_tracks):
+                n_title, n_vid, n_dur = _radio_tracks[idx + 1]
                 n_short = _truncate_title(n_title)
                 n_mins, n_secs = divmod(int(n_dur), 60)
                 print(f"{T}\n\t⥤ Next: {n_short:30s} {n_mins}:{n_secs:02d}{R}")
 
-            filepath = None
-            if playlist_dir:
-                m(f"\tDownloading {short}...")
-                filepath = youtube.download_url(url, str(playlist_dir))
-                m(f"\tDownloaded to {filepath}")
-
             _radio_skip = False
-            player.play_entry(entry, title, args, filepath, flags=flags)
+            player.play_entry(entry, title, args, flags=flags)
             idx += 1
     finally:
-        if old_term:
+        if old_term is not None:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_term)
         signal.signal(signal.SIGINT, old_sigint)
         signal.signal(signal.SIGQUIT, old_sigquit)
@@ -388,15 +422,7 @@ def switch_mode():
     config.Mode = "Offline"
 
 
-def show_help(inf=False):
-    if inf:
-        print(f"{T}Online Commands (detailed):{R}")
-        for cmd, lines in help_detail.ONLINE_HELP.items():
-            for line in lines:
-                print(f"  {line}")
-            print()
-    else:
-        print(f"{T}Online Commands:{R}")
-        for cmd, desc in COMMANDS.items():
-            print(f"  {T}{cmd:12s}{R} {G}{desc}{R}")
-        print(f"{G}  Use 'help -i' for detailed usage{R}")
+def show_help():
+    print(f"{T}Online Commands:{R}")
+    for cmd, desc in COMMANDS.items():
+        print(f"  {T}{cmd:12s}{R} {G}{desc}{R}")

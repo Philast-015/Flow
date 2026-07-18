@@ -1,6 +1,5 @@
 import socket
 import urllib.request
-from . import config
 
 
 def is_connected(timeout: int = 2, hosts: list[str] | None = None) -> bool:
@@ -13,17 +12,14 @@ def is_connected(timeout: int = 2, hosts: list[str] | None = None) -> bool:
         try:
             with urllib.request.urlopen(f"https://{host}", timeout=timeout):
                 pass
-            config.Mode = "Online"
             return True
         except Exception:
             pass
 
         try:
             socket.create_connection((host, 80), timeout=timeout).close()
-            config.Mode = "Online"
             return True
         except Exception:
             continue
 
-    config.Mode = "Offline"
     return False

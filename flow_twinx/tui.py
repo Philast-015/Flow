@@ -25,3 +25,4 @@ def input(prompt: str = "") -> str:
         return builtins.input(f"{config.Primary}{prompt}$ {config.Reset}")
     elif config.Mode == "Offline":
         return builtins.input(f"{config.Secondary}{prompt}$ {config.Reset}")
+    return builtins.input(prompt)

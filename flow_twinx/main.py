@@ -9,13 +9,15 @@ if __name__ == "__main__" and __package__ is None:
     __package__ = "flow_twinx"
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from .imports import config, show_banner, tui_input, is_connected
 from . import shortcuts
+from .imports import config, is_connected, show_banner, tui_input
 
 P = config.Primary
 S = config.Secondary
 M = config.Muted
 R = config.Reset
+
+SHELL_AUTO_BG = {"radio", "savan"}
 
 
 def _spinner(stop):
@@ -55,33 +57,70 @@ def _check_vlc():
 
 def main():
     _check_vlc()
-    stop = False
-    t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
-    t.start()
-    try:
-        is_connected()
-    finally:
-        stop = True
-        t.join()
 
     parser = argparse.ArgumentParser(description="Flow Music Player")
-    parser.add_argument("-r", action="store_true", help="repeat mode")
-    parser.add_argument("-s", action="store_true", help="shuffle")
-    parser.add_argument("-d", action="store_true", help="download mode")
-    parser.add_argument("command", nargs="?", default=None, help="subcommand (play, search, list, ...)")
+    parser.add_argument("--play", nargs="+", help="play a song")
+    parser.add_argument("--rd", nargs="+", help="play radio mix")
+    parser.add_argument("-bg", action="store_true", help="play in background")
+    parser.add_argument("--stop", action="store_true", help="stop background VLC")
+    parser.add_argument(
+        "command", nargs="?", default=None, help="subcommand (play, search, list, ...)"
+    )
 
     args, unknown = parser.parse_known_args()
 
     shortcuts.load()
+
+    if getattr(args, "stop", False):
+        if config.kill_stored():
+            print(f"{P}Stopped VLC{R}")
+        else:
+            print(f"{M}No background VLC running{R}")
+        sys.exit(0)
+
+    if getattr(args, "play", None) is not None:
+        args.command = "play"
+        unknown = args.play + unknown
+    elif getattr(args, "rd", None) is not None:
+        args.command = "radio"
+        unknown = args.rd + unknown
+
+    stop = False
+    t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
+    t.start()
+    try:
+        if is_connected():
+            config.Mode = "Online"
+        else:
+            config.Mode = "Offline"
+    finally:
+        stop = True
+        t.join()
+
     commands = _load_commands()
 
-    show_banner()
-
     if args.command:
+        resolved = []
+        for item in unknown:
+            if item.startswith("-"):
+                alias = item[1:]
+                resolved_cmd = shortcuts.resolve(alias)
+                if resolved_cmd != alias:
+                    if args.command is None:
+                        args.command = resolved_cmd
+                    continue
+            resolved.append(item)
+        unknown = resolved
+
+        if args.command in SHELL_AUTO_BG:
+            args.bg = True
+
+        show_banner()
         commands.run(args.command, unknown, args)
-    elif unknown:
-        print(f"Unknown argument: {' '.join(unknown)}")
     else:
+        show_banner()
+        if unknown:
+            print(f"{M}Unknown command: {' '.join(unknown)}{R}")
         while True:
             try:
                 parts = tui_input().strip().split()
@@ -94,11 +133,10 @@ def main():
                     print(f"{M}Goodbye!{R}")
                     break
                 cmd_args = argparse.Namespace(**vars(args))
-                for flag in ("r", "s", "d"):
+                for flag in ("bg",):
                     setattr(cmd_args, flag, False)
                 commands.run(cmd, extra, cmd_args)
                 if cmd == "switch":
-                    mode = config.Mode
                     commands = _load_commands()
                     show_banner()
             except (EOFError, KeyboardInterrupt):
