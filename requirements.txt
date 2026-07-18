@@ -1,2 +1,5 @@
 python-vlc
 yt_dlp
+ytmusicapi
+numpy
+sounddevice

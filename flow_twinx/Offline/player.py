@@ -2,6 +2,7 @@ import sys
 import time
 import vlc
 from ..imports import config
+from .. import visualizer
 
 P = config.Primary
 S = config.Secondary
@@ -15,17 +16,28 @@ e = lambda t: print(f"{E}{t}{R}")
 i = lambda t: print(f"{P if config.Mode == 'Online' else S}{t}{R}")
 t = lambda t: print(f"{T}{t}{R}")
 
-BAR_WIDTH = 40
 
+def _display_loop(player, duration=0):
+    display = config.Display
+    if display == "none":
+        return
 
-def _progress_bar(elapsed, total):
-    if total <= 0:
-        return ""
-    fraction = min(elapsed / total, 1.0)
-    filled = int(fraction * BAR_WIDTH)
-    bar = "/" * filled + " " * (BAR_WIDTH - filled)
-    pct = int(fraction * 100)
-    return f"  [{bar}] {pct}%"
+    if display == "bars":
+        visualizer.start()
+
+    start = time.time()
+    try:
+        while player.get_state() not in (vlc.State.Ended, vlc.State.Error):
+            if display == "bars":
+                bar_str = visualizer.render(color=S, reset=R)
+                sys.stdout.write(f"\r{bar_str}")
+                sys.stdout.flush()
+            time.sleep(0.08)
+    finally:
+        if display == "bars":
+            visualizer.stop()
+        sys.stdout.write("\r" + " " * 60 + "\r")
+        sys.stdout.flush()
 
 
 def play_file(filepath, title, args=None):
@@ -47,18 +59,9 @@ def play_file(filepath, title, args=None):
     i(f"\nPlaying : {title}")
     m(f"    {dur_min}:{dur_sec:02d}")
 
-    start = time.time()
     try:
-        while player.get_state() not in (vlc.State.Ended, vlc.State.Error):
-            elapsed = time.time() - start
-            bar = _progress_bar(elapsed, duration)
-            sys.stdout.write(f"\r{S}{bar}{R}")
-            sys.stdout.flush()
-            time.sleep(0.5)
+        _display_loop(player, duration=duration)
     except KeyboardInterrupt:
         player.stop()
         sys.stdout.write("\n")
         sys.stdout.flush()
-
-    sys.stdout.write("\n")
-    sys.stdout.flush()

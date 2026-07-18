@@ -1,7 +1,9 @@
 import sys
 import time
+import threading
 import vlc
 from ..imports import config
+from .. import lyrics, visualizer
 
 P = config.Primary
 S = config.Secondary
@@ -15,17 +17,43 @@ e = lambda t: print(f"{E}{t}{R}")
 i = lambda t: print(f"{P if config.Mode == 'Online' else S}{t}{R}")
 t = lambda t: print(f"{T}{t}{R}")
 
-BAR_WIDTH = 40
 
+def _display_loop(player, title, video_id=None, duration=0, stop_check=None):
+    display = config.Display
+    if display == "none":
+        return
 
-def _progress_bar(elapsed, total):
-    if total <= 0:
-        return ""
-    fraction = min(elapsed / total, 1.0)
-    filled = int(fraction * BAR_WIDTH)
-    bar = "/" * filled + " " * (BAR_WIDTH - filled)
-    pct = int(fraction * 100)
-    return f"  [{bar}] {pct}%"
+    fetched_lyrics = None
+    if display == "lyrics":
+        if video_id:
+            fetched_lyrics = lyrics.fetch_lyrics(video_id, title=title)
+        if not fetched_lyrics:
+            m("    No synced lyrics found")
+
+    if display == "bars":
+        visualizer.start()
+
+    start = time.time()
+    last_lyric_line = None
+    try:
+        while player.get_state() not in (vlc.State.Ended, vlc.State.Error):
+            if stop_check and stop_check():
+                break
+            elapsed = time.time() - start
+            if display == "bars":
+                bar_str = visualizer.render(color=P, reset=R)
+                sys.stdout.write(f"\r{bar_str}")
+                sys.stdout.flush()
+            elif display == "lyrics" and fetched_lyrics:
+                line = lyrics.find_line(fetched_lyrics, elapsed)
+                if line and line != last_lyric_line:
+                    last_lyric_line = line
+                    time.sleep(0.3)
+                    print(f"  {P}{line}{R}")
+            time.sleep(0.08)
+    finally:
+        if display == "bars":
+            visualizer.stop()
 
 
 def play_url(url, title, args=None, duration=0):
@@ -39,21 +67,12 @@ def play_url(url, title, args=None, duration=0):
     i(f"\n⤘ Now : {title}")
     m(f"    {dur_min}:{dur_sec:02d}")
 
-    start = time.time()
     try:
-        while player.get_state() not in (vlc.State.Ended, vlc.State.Error):
-            elapsed = time.time() - start
-            bar = _progress_bar(elapsed, duration)
-            sys.stdout.write(f"\r{P}{bar}{R}")
-            sys.stdout.flush()
-            time.sleep(0.5)
+        _display_loop(player, title, duration=duration)
     except KeyboardInterrupt:
         player.stop()
         sys.stdout.write("\n")
         sys.stdout.flush()
-
-    sys.stdout.write("\n")
-    sys.stdout.flush()
 
 
 def play_entry(entry, title, args=None, flags=None):
@@ -76,31 +95,28 @@ def play_entry(entry, title, args=None, flags=None):
     player.play()
 
     duration = entry.get("duration", 0)
+    video_id = entry.get("id")
     dur_min, dur_sec = divmod(int(duration), 60)
     i(f"\n⤘ Now : {title}")
     m(f"    {dur_min}:{dur_sec:02d}")
 
-    start = time.time()
     skipped = False
+
+    def stop_check():
+        nonlocal skipped
+        if flags:
+            if flags.get("quit", lambda: False)():
+                player.stop()
+                return True
+            if flags.get("skip", lambda: False)():
+                skipped = True
+                player.stop()
+                return True
+        return False
+
     try:
-        while player.get_state() not in (vlc.State.Ended, vlc.State.Error):
-            if flags:
-                if flags.get("quit", lambda: False)():
-                    player.stop()
-                    return
-                if flags.get("skip", lambda: False)():
-                    skipped = True
-                    player.stop()
-                    break
-            elapsed = time.time() - start
-            bar = _progress_bar(elapsed, duration)
-            sys.stdout.write(f"\r{P}{bar}{R}")
-            sys.stdout.flush()
-            time.sleep(0.5)
+        _display_loop(player, title, video_id=video_id, duration=duration, stop_check=stop_check)
     except KeyboardInterrupt:
         player.stop()
         sys.stdout.write("\n")
         sys.stdout.flush()
-
-    sys.stdout.write("\n")
-    sys.stdout.flush()

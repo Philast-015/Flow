@@ -61,7 +61,6 @@ def main():
     parser = argparse.ArgumentParser(description="Flow Music Player")
     parser.add_argument("--play", nargs="+", help="play a song")
     parser.add_argument("--rd", nargs="+", help="play radio mix")
-    parser.add_argument("-bg", action="store_true", help="play in background")
     parser.add_argument("--stop", action="store_true", help="stop background VLC")
     parser.add_argument(
         "command", nargs="?", default=None, help="subcommand (play, search, list, ...)"

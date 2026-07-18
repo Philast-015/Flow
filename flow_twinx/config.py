@@ -55,16 +55,37 @@ _COLORS = {
 _COLOR_NAMES = {v: k for k, v in _COLORS.items()}
 
 _TARGET_ALIASES = {"pri": "primary", "sec": "secondary", "ter": "tertiary"}
-_TARGETS = {"primary", "secondary", "tertiary"}
+_TARGETS = {"primary", "secondary", "tertiary", "display"}
+_DISPLAY_MODES = {"none", "bars", "lyrics"}
+_BAR_SPACING = {"min", "fit", "max"}
 
 Primary = Cyan
 Secondary = Purple
 Tertiary = Blue
 Muted = Grey
+Display = "bars"
+BarWidth = 20
+BarHeight = 10
+BarSpacing = 1
+
+
+def get_bar_spacing():
+    import os
+    if BarSpacing == "min":
+        return 0
+    if BarSpacing == "max":
+        return 4
+    if BarSpacing == "fit":
+        try:
+            cols = os.get_terminal_size().columns
+        except OSError:
+            cols = 80
+        return max(0, min(4, (cols - BarWidth) // max(BarWidth - 1, 1)))
+    return int(BarSpacing)
 
 
 def _load_config():
-    global Primary, Secondary, Tertiary
+    global Primary, Secondary, Tertiary, Display, BarWidth, BarHeight, BarSpacing
     if not CONFIG_FILE.exists():
         return
     try:
@@ -75,6 +96,26 @@ def _load_config():
             Secondary = _COLORS[data["secondary"]]
         if "tertiary" in data and data["tertiary"] in _COLORS:
             Tertiary = _COLORS[data["tertiary"]]
+        if "display" in data and data["display"] in _DISPLAY_MODES:
+            Display = data["display"]
+        if (
+            "bar_width" in data
+            and isinstance(data["bar_width"], int)
+            and 4 <= data["bar_width"] <= 80
+        ):
+            BarWidth = data["bar_width"]
+        if (
+            "bar_height" in data
+            and isinstance(data["bar_height"], int)
+            and 2 <= data["bar_height"] <= 24
+        ):
+            BarHeight = data["bar_height"]
+        if (
+            "bar_spacing" in data
+            and isinstance(data["bar_spacing"], int)
+            and 0 <= data["bar_spacing"] <= 4
+        ):
+            BarSpacing = data["bar_spacing"]
     except (json.JSONDecodeError, OSError):
         pass
 
@@ -85,6 +126,10 @@ def _save_config():
         "primary": _COLOR_NAMES.get(Primary, "cyan"),
         "secondary": _COLOR_NAMES.get(Secondary, "purple"),
         "tertiary": _COLOR_NAMES.get(Tertiary, "blue"),
+        "display": Display,
+        "bar_width": BarWidth,
+        "bar_height": BarHeight,
+        "bar_spacing": BarSpacing,
     }
     CONFIG_FILE.write_text(json.dumps(data, indent=2))
 
@@ -122,7 +167,9 @@ def clear_pid():
 
 
 def kill_stored():
-    import os, signal
+    import os
+    import signal
+
     pid = read_pid()
     if pid is None:
         return False
@@ -135,46 +182,104 @@ def kill_stored():
 
 
 def cmd_config(extra: list[str], args=None):
-    global Primary, Secondary, Tertiary
+    global Primary, Secondary, Tertiary, Display, BarWidth, BarHeight, BarSpacing
     if extra and extra[0] == "help":
         print(f"{Tertiary}Available targets:{Reset}")
         print(f"  {Primary}primary{Reset}   (aliases: pri)")
         print(f"  {Secondary}secondary{Reset} (aliases: sec)")
         print(f"  {Tertiary}tertiary{Reset}  (aliases: ter)")
+        print(f"  {Grey}display{Reset}    (none, bars, lyrics)")
+        print(f"  {Grey}barwidth{Reset}   (4-80, current: {BarWidth})")
+        print(f"  {Grey}barheight{Reset}  (2-24, current: {BarHeight})")
+        print(f"  {Grey}barspacing{Reset} (0-4, min, fit, max — current: {BarSpacing})")
         print(f"\n{Tertiary}Available colors:{Reset}")
         for name, code in _COLORS.items():
             print(f"  {code}{name}{Reset}")
         print(f"\n{Grey}Config file: {CONFIG_FILE}{Reset}")
         return
     if not extra:
-        print(f"{Primary}Usage: config <primary|secondary|tertiary> <color>{Reset}")
+        print(f"{Primary}Usage: config <target> <value>{Reset}")
         print(f"       config -h{Reset}")
         return
     if len(extra) < 2:
-        print(f"Usage: config <primary|secondary|tertiary> <color>{Reset}")
+        print(f"Usage: config <target> <value>{Reset}")
         return
     target = _TARGET_ALIASES.get(extra[0].lower(), extra[0].lower())
-    color_name = extra[1].lower()
-    if color_name not in _COLORS:
-        print(
-            f"Unknown color '{color_name}'. Use 'config -h' to see available colors.{Reset}"
-        )
-        return
+    value = extra[1].lower()
     if target == "primary":
-        Primary = _COLORS[color_name]
+        if value not in _COLORS:
+            print(f"Unknown color '{value}'. Use 'config -h' to see available colors.")
+            return
+        Primary = _COLORS[value]
         _save_config()
-        print(f"{Primary}Primary color changed to {color_name}{Reset}")
+        print(f"{Primary}Primary color changed to {value}{Reset}")
     elif target == "secondary":
-        Secondary = _COLORS[color_name]
+        if value not in _COLORS:
+            print(f"Unknown color '{value}'. Use 'config -h' to see available colors.")
+            return
+        Secondary = _COLORS[value]
         _save_config()
-        print(f"{Secondary}Secondary color changed to {color_name}{Reset}")
+        print(f"{Secondary}Secondary color changed to {value}{Reset}")
     elif target == "tertiary":
-        Tertiary = _COLORS[color_name]
+        if value not in _COLORS:
+            print(f"Unknown color '{value}'. Use 'config -h' to see available colors.")
+            return
+        Tertiary = _COLORS[value]
         _save_config()
-        print(f"{Tertiary}Tertiary color changed to {color_name}{Reset}")
+        print(f"{Tertiary}Tertiary color changed to {value}{Reset}")
+    elif target == "display":
+        if value not in _DISPLAY_MODES:
+            print(f"Unknown display mode '{value}'. Options: none, bars, lyrics")
+            return
+        Display = value
+        _save_config()
+        print(f"{Tertiary}Display mode changed to {value}{Reset}")
+    elif target in ("barwidth", "width"):
+        try:
+            v = int(extra[1])
+        except ValueError:
+            print("barwidth must be an integer (4-80)")
+            return
+        if not (4 <= v <= 80):
+            print("barwidth must be between 4 and 80")
+            return
+        BarWidth = v
+        _save_config()
+        print(f"{Tertiary}Bar width changed to {v}{Reset}")
+    elif target in ("barheight", "height"):
+        try:
+            v = int(extra[1])
+        except ValueError:
+            print("barheight must be an integer (2-24)")
+            return
+        if not (2 <= v <= 24):
+            print("barheight must be between 2 and 24")
+            return
+        BarHeight = v
+        _save_config()
+        print(f"{Tertiary}Bar height changed to {v}{Reset}")
+    elif target in ("barspacing", "spacing"):
+        if value in _BAR_SPACING:
+            BarSpacing = value
+            _save_config()
+            print(f"{Tertiary}Bar spacing changed to {value}{Reset}")
+        else:
+            try:
+                v = int(extra[1])
+            except ValueError:
+                print("barspacing must be 0-4, min, fit, or max")
+                return
+            if not (0 <= v <= 4):
+                print("barspacing must be between 0 and 4")
+                return
+            BarSpacing = v
+            _save_config()
+            print(f"{Tertiary}Bar spacing changed to {v}{Reset}")
     else:
         aliases = ", ".join(f"{k}->{v}" for k, v in _TARGET_ALIASES.items())
-        print(f"Unknown target '{target}'. Use: primary, sec, ter ({aliases}){Reset}")
+        print(
+            f"Unknown target '{target}'. Use: primary, sec, ter, display ({aliases}){Reset}"
+        )
 
 
 _load_config()
