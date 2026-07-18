@@ -1,4 +1,5 @@
 import os
+import random
 from ..imports import config, merge_flags, is_connected
 from .. import shortcuts
 from . import file as lib
@@ -161,12 +162,24 @@ def _play_liked(args):
     if not liked:
         e("No liked songs yet")
         return
+    songs = list(liked)
+    if getattr(args, "shuffle", False):
+        random.shuffle(songs)
+    repeat = getattr(args, "repeat", False)
+    repeat_count = getattr(args, "repeat_count", 0)
+    iteration = 0
     if getattr(args, "bg", False):
         if not _fork_bg("Playing liked songs"):
             return
-    for song in liked:
-        _last_played = song
-        player.play_file(song, song.stem, args)
+    while True:
+        for song in songs:
+            _last_played = song
+            player.play_file(song, song.stem, args)
+        if not repeat:
+            break
+        iteration += 1
+        if repeat_count > 0 and iteration >= repeat_count:
+            break
 
 def _play_all(args):
     global _last_played
@@ -174,12 +187,24 @@ def _play_all(args):
     if not all_songs:
         e("No downloaded songs yet")
         return
+    songs = list(all_songs)
+    if getattr(args, "shuffle", False):
+        random.shuffle(songs)
+    repeat = getattr(args, "repeat", False)
+    repeat_count = getattr(args, "repeat_count", 0)
+    iteration = 0
     if getattr(args, "bg", False):
         if not _fork_bg("Playing all songs"):
             return
-    for song in all_songs:
-        _last_played = song
-        player.play_file(song, song.stem, args)
+    while True:
+        for song in songs:
+            _last_played = song
+            player.play_file(song, song.stem, args)
+        if not repeat:
+            break
+        iteration += 1
+        if repeat_count > 0 and iteration >= repeat_count:
+            break
 
 def _play_album(album: str, args):
     global _last_played
@@ -187,12 +212,24 @@ def _play_album(album: str, args):
     if not songs:
         e(f"No songs found in album '{album}'")
         return
+    tracks = list(songs)
+    if getattr(args, "shuffle", False):
+        random.shuffle(tracks)
+    repeat = getattr(args, "repeat", False)
+    repeat_count = getattr(args, "repeat_count", 0)
+    iteration = 0
     if getattr(args, "bg", False):
         if not _fork_bg(f"Playing album: {album}"):
             return
-    for song in songs:
-        _last_played = song
-        player.play_file(song, song.stem, args)
+    while True:
+        for song in tracks:
+            _last_played = song
+            player.play_file(song, song.stem, args)
+        if not repeat:
+            break
+        iteration += 1
+        if repeat_count > 0 and iteration >= repeat_count:
+            break
 
 
 def like_track():

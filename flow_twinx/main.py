@@ -132,8 +132,9 @@ def main():
                     print(f"{M}Goodbye!{R}")
                     break
                 cmd_args = argparse.Namespace(**vars(args))
-                for flag in ("bg",):
+                for flag in ("bg", "repeat", "shuffle"):
                     setattr(cmd_args, flag, False)
+                cmd_args.repeat_count = 0
                 commands.run(cmd, extra, cmd_args)
                 if cmd == "switch":
                     commands = _load_commands()

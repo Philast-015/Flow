@@ -1,4 +1,5 @@
 import os
+import random
 import signal
 import sys
 import termios
@@ -133,25 +134,52 @@ def play(extra: list[str], args):
         _play_liked(args)
         return
 
+    repeat = getattr(args, "repeat", False)
+    shuffle = getattr(args, "shuffle", False)
+
     if arg.isdigit():
         idx = int(arg) - 1
         if idx < 0 or idx >= len(_last_results):
             print("Index out of range")
             return
         entry, title, _ = _last_results[idx]
+        _last_played = (entry, title)
+        if getattr(args, "bg", False):
+            if not _fork_bg("Now playing"):
+                return
+        player.play_entry(entry, title, args)
+        return
+
+    _do_search(arg)
+    if not _last_results:
+        print("No results found")
+        return
+
+    if repeat or shuffle:
+        results = list(_last_results)
+        if shuffle:
+            random.shuffle(results)
+        repeat_count = getattr(args, "repeat_count", 0)
+        iteration = 0
+        while True:
+            for entry, title, _ in results:
+                _last_played = (entry, title)
+                if getattr(args, "bg", False):
+                    if not _fork_bg("Now playing"):
+                        return
+                player.play_entry(entry, title, args)
+            if not repeat:
+                break
+            iteration += 1
+            if repeat_count > 0 and iteration >= repeat_count:
+                break
     else:
-        _do_search(arg)
-        if not _last_results:
-            print("No results found")
-            return
         entry, title, _ = _last_results[0]
-
-    _last_played = (entry, title)
-
-    if getattr(args, "bg", False):
-        if not _fork_bg("Now playing"):
-            return
-    player.play_entry(entry, title, args)
+        _last_played = (entry, title)
+        if getattr(args, "bg", False):
+            if not _fork_bg("Now playing"):
+                return
+        player.play_entry(entry, title, args)
 
 
 def _play_liked(args):
@@ -162,17 +190,31 @@ def _play_liked(args):
     if not liked:
         e("     No liked songs yet")
         return
+    songs = []
     for line in liked:
         if "|" not in line:
             continue
         title, url = line.split("|", 1)
-        _do_search(title)
-        if not _last_results:
-            m(f"    Skipping {title} (not found)")
-            continue
-        entry, _, _ = _last_results[0]
-        _last_played = (entry, title)
-        player.play_entry(entry, title, args)
+        songs.append((title, url))
+    if getattr(args, "shuffle", False):
+        random.shuffle(songs)
+    repeat = getattr(args, "repeat", False)
+    repeat_count = getattr(args, "repeat_count", 0)
+    iteration = 0
+    while True:
+        for title, url in songs:
+            _do_search(title)
+            if not _last_results:
+                m(f"    Skipping {title} (not found)")
+                continue
+            entry, _, _ = _last_results[0]
+            _last_played = (entry, title)
+            player.play_entry(entry, title, args)
+        if not repeat:
+            break
+        iteration += 1
+        if repeat_count > 0 and iteration >= repeat_count:
+            break
 
 
 _savan_results = []
@@ -187,34 +229,69 @@ def savan_cmd(extra, args):
         e("No song specified")
         return
 
+    repeat = getattr(args, "repeat", False)
+    shuffle = getattr(args, "shuffle", False)
+
     if arg.isdigit():
         idx = int(arg) - 1
         if idx < 0 or idx >= len(_savan_results):
             e("Index out of range")
             return
         entry, title, dur = _savan_results[idx]
-    else:
-        stop = False
-        t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
-        t.start()
-        _savan_results = savan.search(arg)
-        stop = True
-        t.join()
-        if not _savan_results:
-            e("No results found")
+        url = savan.best_url(entry)
+        if not url:
+            e("No playable URL found")
             return
-        entry, title, dur = _savan_results[0]
-
-    url = savan.best_url(entry)
-    if not url:
-        e("No playable URL found")
+        _last_played = (entry, title)
+        if getattr(args, "bg", False):
+            if not _fork_bg("Now playing"):
+                return
+        player.play_url(url, title, args, dur)
         return
 
-    _last_played = (entry, title)
-    if getattr(args, "bg", False):
-        if not _fork_bg("Now playing"):
+    stop = False
+    t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
+    t.start()
+    _savan_results = savan.search(arg)
+    stop = True
+    t.join()
+    if not _savan_results:
+        e("No results found")
+        return
+
+    if repeat or shuffle:
+        results = list(_savan_results)
+        if shuffle:
+            random.shuffle(results)
+        repeat_count = getattr(args, "repeat_count", 0)
+        iteration = 0
+        while True:
+            for entry, title, dur in results:
+                url = savan.best_url(entry)
+                if not url:
+                    e(f"No playable URL for {title}, skipping")
+                    continue
+                _last_played = (entry, title)
+                if getattr(args, "bg", False):
+                    if not _fork_bg("Now playing"):
+                        return
+                player.play_url(url, title, args, dur)
+            if not repeat:
+                break
+            iteration += 1
+            if repeat_count > 0 and iteration >= repeat_count:
+                break
+    else:
+        entry, title, dur = _savan_results[0]
+        url = savan.best_url(entry)
+        if not url:
+            e("No playable URL found")
             return
-    player.play_url(url, title, args, dur)
+        _last_played = (entry, title)
+        if getattr(args, "bg", False):
+            if not _fork_bg("Now playing"):
+                return
+        player.play_url(url, title, args, dur)
 
 
 def savan_search(query):
@@ -334,6 +411,9 @@ def radio(extra, args):
 
     _radio_tracks = tracks
 
+    if getattr(args, "shuffle", False):
+        random.shuffle(_radio_tracks)
+
     global _radio_quit, _radio_skip
     _radio_quit = False
     _radio_skip = False
@@ -358,24 +438,34 @@ def radio(extra, args):
 
     flags = {"quit": lambda: _radio_quit, "skip": lambda: _radio_skip}
 
-    idx = 0
+    repeat = getattr(args, "repeat", False)
+    repeat_count = getattr(args, "repeat_count", 0)
+    iteration = 0
+
     try:
-        while idx < len(_radio_tracks) and not _radio_quit:
-            title, vid, dur = _radio_tracks[idx]
-            url = f"https://www.youtube.com/watch?v={vid}"
-            entry = youtube.get_entry(url)
-            short = _truncate_title(title)
-            mins, secs = divmod(int(dur), 60)
+        while True:
+            idx = 0
+            while idx < len(_radio_tracks) and not _radio_quit:
+                title, vid, dur = _radio_tracks[idx]
+                url = f"https://www.youtube.com/watch?v={vid}"
+                entry = youtube.get_entry(url)
+                short = _truncate_title(title)
+                mins, secs = divmod(int(dur), 60)
 
-            if idx + 1 < len(_radio_tracks):
-                n_title, n_vid, n_dur = _radio_tracks[idx + 1]
-                n_short = _truncate_title(n_title)
-                n_mins, n_secs = divmod(int(n_dur), 60)
-                print(f"{T}\n\t⥤ Next: {n_short:30s} {n_mins}:{n_secs:02d}{R}")
+                if idx + 1 < len(_radio_tracks):
+                    n_title, n_vid, n_dur = _radio_tracks[idx + 1]
+                    n_short = _truncate_title(n_title)
+                    n_mins, n_secs = divmod(int(n_dur), 60)
+                    print(f"{T}\n\t⥤ Next: {n_short:30s} {n_mins}:{n_secs:02d}{R}")
 
-            _radio_skip = False
-            player.play_entry(entry, title, args, flags=flags)
-            idx += 1
+                _radio_skip = False
+                player.play_entry(entry, title, args, flags=flags)
+                idx += 1
+            if not repeat or _radio_quit:
+                break
+            iteration += 1
+            if repeat_count > 0 and iteration >= repeat_count:
+                break
     finally:
         if old_term is not None:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_term)

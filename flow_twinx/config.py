@@ -5,15 +5,25 @@ CONFIG_FILE = pathlib.Path.home() / ".flow/config.json"
 
 
 def merge_flags(extra: list[str], args) -> tuple[list[str], object]:
-    mapping = {"-bg": "bg"}
+    mapping = {"-bg": "bg", "-s": "shuffle"}
     rest = []
-    for item in extra:
-        if item in mapping:
+    i = 0
+    while i < len(extra):
+        item = extra[i]
+        if item == "-r":
+            setattr(args, "repeat", True)
+            if i + 1 < len(extra) and extra[i + 1].isdigit():
+                setattr(args, "repeat_count", int(extra[i + 1]))
+                i += 1
+            else:
+                setattr(args, "repeat_count", -1)
+        elif item in mapping:
             setattr(args, mapping[item], True)
         elif item.startswith("-"):
             print(f"Unknown flag: {item}")
         else:
             rest.append(item)
+        i += 1
     return rest, args
 
 
