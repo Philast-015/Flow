@@ -8,7 +8,7 @@ A terminal-based music player with online streaming and offline library modes.
 - **Online mode** — Search and stream audio from YouTube via `yt-dlp` and `python-vlc`
 - **Offline mode** — Play local audio files with album support, search, and a liked-songs collection
 - **Download** — Save tracks from YouTube to your local library with the `-d` flag
-- **Repeat & shuffle** — Loop tracks or play in random order
+- **Repeat & shuffle** — Loop tracks n times or play in random order
 - **Like/unlike** — Save favorites to a dedicated playlist
 - **Tab completion** — Auto-complete commands and song names in offline mode
 - **Colored TUI** — Cyan theme for online, magenta for offline, with borders and banners

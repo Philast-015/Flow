@@ -171,15 +171,18 @@ def _play_liked(args):
     if getattr(args, "bg", False):
         if not _fork_bg("Playing liked songs"):
             return
-    while True:
-        for song in songs:
-            _last_played = song
-            player.play_file(song, song.stem, args)
-        if not repeat:
-            break
-        iteration += 1
-        if repeat_count > 0 and iteration >= repeat_count:
-            break
+    try:
+        while True:
+            for song in songs:
+                _last_played = song
+                player.play_file(song, song.stem, args)
+            if not repeat:
+                break
+            iteration += 1
+            if repeat_count > 0 and iteration >= repeat_count:
+                break
+    except KeyboardInterrupt:
+        pass
 
 def _play_all(args):
     global _last_played
@@ -196,15 +199,18 @@ def _play_all(args):
     if getattr(args, "bg", False):
         if not _fork_bg("Playing all songs"):
             return
-    while True:
-        for song in songs:
-            _last_played = song
-            player.play_file(song, song.stem, args)
-        if not repeat:
-            break
-        iteration += 1
-        if repeat_count > 0 and iteration >= repeat_count:
-            break
+    try:
+        while True:
+            for song in songs:
+                _last_played = song
+                player.play_file(song, song.stem, args)
+            if not repeat:
+                break
+            iteration += 1
+            if repeat_count > 0 and iteration >= repeat_count:
+                break
+    except KeyboardInterrupt:
+        pass
 
 def _play_album(album: str, args):
     global _last_played
@@ -221,15 +227,18 @@ def _play_album(album: str, args):
     if getattr(args, "bg", False):
         if not _fork_bg(f"Playing album: {album}"):
             return
-    while True:
-        for song in tracks:
-            _last_played = song
-            player.play_file(song, song.stem, args)
-        if not repeat:
-            break
-        iteration += 1
-        if repeat_count > 0 and iteration >= repeat_count:
-            break
+    try:
+        while True:
+            for song in tracks:
+                _last_played = song
+                player.play_file(song, song.stem, args)
+            if not repeat:
+                break
+            iteration += 1
+            if repeat_count > 0 and iteration >= repeat_count:
+                break
+    except KeyboardInterrupt:
+        pass
 
 
 def like_track():

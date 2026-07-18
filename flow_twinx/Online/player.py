@@ -18,6 +18,18 @@ i = lambda t: print(f"{P if config.Mode == 'Online' else S}{t}{R}")
 t = lambda t: print(f"{T}{t}{R}")
 
 
+def _flags_str(args):
+    if not args:
+        return ""
+    parts = []
+    if getattr(args, "repeat", False):
+        count = getattr(args, "repeat_count", 0)
+        parts.append(f"[Repeat:{'∞' if count < 0 else count}]")
+    if getattr(args, "shuffle", False):
+        parts.append("[Shuffle:On]")
+    return "  ".join(parts)
+
+
 def _display_loop(player, title, video_id=None, duration=0, stop_check=None):
     display = config.Display
     if display == "none":
@@ -54,6 +66,8 @@ def _display_loop(player, title, video_id=None, duration=0, stop_check=None):
     finally:
         if display == "bars":
             visualizer.stop()
+        sys.stdout.write("\r" + " " * 60 + "\r\n")
+        sys.stdout.flush()
 
 
 def play_url(url, title, args=None, duration=0):
@@ -64,8 +78,9 @@ def play_url(url, title, args=None, duration=0):
     player.play()
 
     dur_min, dur_sec = divmod(int(duration), 60)
+    flags = _flags_str(args)
     i(f"\n⤘ Now : {title}")
-    m(f"    {dur_min}:{dur_sec:02d}")
+    m(f"    [{dur_min}:{dur_sec:02d}]  {flags}" if flags else f"    [{dur_min}:{dur_sec:02d}]")
 
     try:
         _display_loop(player, title, duration=duration)
@@ -73,6 +88,7 @@ def play_url(url, title, args=None, duration=0):
         player.stop()
         sys.stdout.write("\n")
         sys.stdout.flush()
+        raise
 
 
 def play_entry(entry, title, args=None, flags=None):
@@ -97,8 +113,9 @@ def play_entry(entry, title, args=None, flags=None):
     duration = entry.get("duration", 0)
     video_id = entry.get("id")
     dur_min, dur_sec = divmod(int(duration), 60)
+    fstr = _flags_str(args)
     i(f"\n⤘ Now : {title}")
-    m(f"    {dur_min}:{dur_sec:02d}")
+    m(f"    [{dur_min}:{dur_sec:02d}]  {fstr}" if fstr else f"    [{dur_min}:{dur_sec:02d}]")
 
     skipped = False
 
@@ -120,3 +137,4 @@ def play_entry(entry, title, args=None, flags=None):
         player.stop()
         sys.stdout.write("\n")
         sys.stdout.flush()
+        raise

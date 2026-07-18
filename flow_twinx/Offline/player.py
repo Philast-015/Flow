@@ -17,6 +17,18 @@ i = lambda t: print(f"{P if config.Mode == 'Online' else S}{t}{R}")
 t = lambda t: print(f"{T}{t}{R}")
 
 
+def _flags_str(args):
+    if not args:
+        return ""
+    parts = []
+    if getattr(args, "repeat", False):
+        count = getattr(args, "repeat_count", 0)
+        parts.append(f"[Repeat:{'∞' if count < 0 else count}]")
+    if getattr(args, "shuffle", False):
+        parts.append("[Shuffle:On]")
+    return "  ".join(parts)
+
+
 def _display_loop(player, duration=0):
     display = config.Display
     if display == "none":
@@ -36,7 +48,7 @@ def _display_loop(player, duration=0):
     finally:
         if display == "bars":
             visualizer.stop()
-        sys.stdout.write("\r" + " " * 60 + "\r")
+        sys.stdout.write("\r" + " " * 60 + "\r\n")
         sys.stdout.flush()
 
 
@@ -56,8 +68,9 @@ def play_file(filepath, title, args=None):
     if duration <= 0:
         duration = 0
     dur_min, dur_sec = divmod(int(duration), 60)
+    flags = _flags_str(args)
     i(f"\nPlaying : {title}")
-    m(f"    {dur_min}:{dur_sec:02d}")
+    m(f"    [{dur_min}:{dur_sec:02d}]  {flags}" if flags else f"    [{dur_min}:{dur_sec:02d}]")
 
     try:
         _display_loop(player, duration=duration)
@@ -65,3 +78,4 @@ def play_file(filepath, title, args=None):
         player.stop()
         sys.stdout.write("\n")
         sys.stdout.flush()
+        raise

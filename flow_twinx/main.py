@@ -115,7 +115,10 @@ def main():
             args.bg = True
 
         show_banner()
-        commands.run(args.command, unknown, args)
+        try:
+            commands.run(args.command, unknown, args)
+        except KeyboardInterrupt:
+            pass
     else:
         show_banner()
         if unknown:
@@ -135,7 +138,12 @@ def main():
                 for flag in ("bg", "repeat", "shuffle"):
                     setattr(cmd_args, flag, False)
                 cmd_args.repeat_count = 0
-                commands.run(cmd, extra, cmd_args)
+                try:
+                    commands.run(cmd, extra, cmd_args)
+                except KeyboardInterrupt:
+                    pass
+                if getattr(cmd_args, "bg", False):
+                    break
                 if cmd == "switch":
                     commands = _load_commands()
                     show_banner()
