@@ -5,7 +5,7 @@ CONFIG_FILE = pathlib.Path.home() / ".flow/config.json"
 
 
 def merge_flags(extra: list[str], args) -> tuple[list[str], object]:
-    mapping = {"-bg": "bg", "-s": "shuffle"}
+    mapping = {"-bg": "bg", "-s": "shuffle", "-d": "download"}
     rest = []
     i = 0
     while i < len(extra):
@@ -78,9 +78,52 @@ BarWidth = 20
 BarHeight = 10
 BarSpacing = 1
 
+####### Be carefull this will make everything print on screen including links title view and all things ###
+DEV_MODE = False
+###########################################################################################################
+
+
+def dev_print(label: str, data: dict | list | str | None = None):
+    if not DEV_MODE:
+        return
+    Y = "\033[1;33m"
+    D = "\033[90m"
+    RST = "\033[0m"
+    sep = f"{D}{'─' * 50}{RST}"
+    print(f"\n{Y}┌─ [DEV] {label} ─{RST}")
+    print(sep)
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if isinstance(v, (list, tuple)):
+                print(f"{Y}│{RST} {D}{k}:{RST}")
+                for item in v:
+                    if isinstance(item, dict):
+                        for ik, iv in item.items():
+                            print(f"{Y}│{RST}   {D}{ik}:{RST} {iv}")
+                    else:
+                        print(f"{Y}│{RST}   {item}")
+            else:
+                print(f"{Y}│{RST} {D}{k}:{RST} {v}")
+    elif isinstance(data, (list, tuple)):
+        for idx, item in enumerate(data):
+            if isinstance(item, dict):
+                print(f"{Y}│{RST} {D}[{idx}]{RST}")
+                for k, v in item.items():
+                    print(f"{Y}│{RST}   {D}{k}:{RST} {v}")
+            else:
+                print(f"{Y}│{RST} {D}[{idx}]{RST} {item}")
+    elif data is not None:
+        text = str(data)
+        while text:
+            chunk, text = text[:70], text[70:]
+            print(f"{Y}│{RST} {chunk}")
+    print(sep)
+    print(f"{Y}└─{RST}\n")
+
 
 def get_bar_spacing():
     import os
+
     if BarSpacing == "min":
         return 0
     if BarSpacing == "max":
@@ -146,13 +189,14 @@ def _save_config():
 
 DOWNLOAD_DIR = pathlib.Path.home() / ".flow/downloads"
 
-VERSION = 0.3
+VERSION = "0.4.3"
 
 Mode = "Online"
 
 liked_music = pathlib.Path.home() / ".flow/liked.txt"
 
 MAX_RESULTS_RADIO = 35
+MAX_SEARCH_RESULTS = 5
 
 PID_FILE = pathlib.Path.home() / ".flow/vlc.pid"
 

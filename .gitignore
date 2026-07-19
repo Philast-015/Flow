@@ -6,3 +6,4 @@ dist
 *.egg*
 build
 *.spec
+flow

@@ -1,6 +1,6 @@
 import builtins
-from . import config
 
+from . import config
 
 BANNER = r"""
 ███████╗██╗      ██████╗ ██╗    ██╗
@@ -15,8 +15,12 @@ BANNER = r"""
 def show_banner():
     c = config.Primary if config.Mode == "Online" else config.Secondary
     builtins.print(f"{c}{BANNER}{config.Reset}")
-    builtins.print(f"{config.Muted}         Flow Music Player v{config.VERSION}{config.Reset}")
+    builtins.print(
+        f"{config.Muted}         Flow Music Player v{config.VERSION}{config.Reset}"
+    )
     builtins.print(f"{c}         Mode : {config.Mode}{config.Reset}")
+    if config.DEV_MODE:
+        print(f"     {config.Red}       [Dev Mode]{config.Reset}")
     builtins.print()
 
 

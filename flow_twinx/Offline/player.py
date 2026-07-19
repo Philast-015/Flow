@@ -1,4 +1,10 @@
+import errno
+import fcntl
+import os
+import signal
 import sys
+import termios
+import threading
 import time
 import vlc
 from ..imports import config
@@ -16,6 +22,67 @@ e = lambda t: print(f"{E}{t}{R}")
 i = lambda t: print(f"{P if config.Mode == 'Online' else S}{t}{R}")
 t = lambda t: print(f"{T}{t}{R}")
 
+_paused = False
+_player = None
+_original_term = None
+
+
+def _sigusr1_toggle(sig, frame):
+    global _paused
+    _paused = not _paused
+    if _player:
+        _player.pause()
+
+
+def _setup_pause_input():
+    global _original_term
+    fd = sys.stdin.fileno()
+    try:
+        _original_term = termios.tcgetattr(fd)
+        new = termios.tcgetattr(fd)
+        new[0] &= ~termios.IXON
+        new[6][termios.VSUSP] = 0
+        termios.tcsetattr(fd, termios.TCSADRAIN, new)
+    except (termios.error, OSError):
+        _original_term = None
+        return
+    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+    signal.signal(signal.SIGUSR1, _sigusr1_toggle)
+    signal.signal(signal.SIGTSTP, signal.SIG_IGN)
+    thread = threading.Thread(target=_input_reader, daemon=True)
+    thread.start()
+
+
+def _input_reader():
+    fd = sys.stdin.fileno()
+    try:
+        while True:
+            try:
+                ch = os.read(fd, 1)
+            except OSError as ex:
+                if ex.errno == errno.EAGAIN:
+                    time.sleep(0.05)
+                    continue
+                break
+            if ch == b"\x10":
+                os.kill(os.getpid(), signal.SIGUSR1)
+    except OSError:
+        pass
+
+
+def _restore_pause_input():
+    global _original_term
+    if _original_term is not None:
+        try:
+            fd = sys.stdin.fileno()
+            flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+            fcntl.fcntl(fd, fcntl.F_SETFL, flags & ~os.O_NONBLOCK)
+            termios.tcsetattr(fd, termios.TCSADRAIN, _original_term)
+        except (termios.error, OSError):
+            pass
+        _original_term = None
+
 
 def _flags_str(args):
     if not args:
@@ -30,6 +97,7 @@ def _flags_str(args):
 
 
 def _display_loop(player, duration=0):
+    global _paused
     display = config.Display
     if display == "none":
         return
@@ -38,13 +106,29 @@ def _display_loop(player, duration=0):
         visualizer.start()
 
     start = time.time()
+    paused_printed = False
     try:
         while player.get_state() not in (vlc.State.Ended, vlc.State.Error):
+            if _paused:
+                if not paused_printed:
+                    sys.stdout.write(f"\r  {T}[Paused]{R}  ")
+                    sys.stdout.flush()
+                    paused_printed = True
+                try:
+                    time.sleep(0.1)
+                except OSError:
+                    pass
+                continue
+            if paused_printed:
+                paused_printed = False
             if display == "bars":
                 bar_str = visualizer.render(color=S, reset=R)
                 sys.stdout.write(f"\r{bar_str}")
                 sys.stdout.flush()
-            time.sleep(0.08)
+            try:
+                time.sleep(0.08)
+            except OSError:
+                pass
     finally:
         if display == "bars":
             visualizer.stop()
@@ -53,15 +137,18 @@ def _display_loop(player, duration=0):
 
 
 def play_file(filepath, title, args=None):
+    global _player, _paused
+    _paused = False
     instance = vlc.Instance("--no-video --quiet")
-    player = instance.media_player_new()
+    _player = instance.media_player_new()
     media = instance.media_new(str(filepath))
-    player.set_media(media)
-    player.play()
+    _player.set_media(media)
+    _player.play()
+    _setup_pause_input()
 
     duration = 0
     for _ in range(50):
-        duration = player.get_length() / 1000
+        duration = _player.get_length() / 1000
         if duration > 0:
             break
         time.sleep(0.1)
@@ -73,9 +160,11 @@ def play_file(filepath, title, args=None):
     m(f"    [{dur_min}:{dur_sec:02d}]  {flags}" if flags else f"    [{dur_min}:{dur_sec:02d}]")
 
     try:
-        _display_loop(player, duration=duration)
+        _display_loop(_player, duration=duration)
     except KeyboardInterrupt:
-        player.stop()
+        _player.stop()
         sys.stdout.write("\n")
         sys.stdout.flush()
         raise
+    finally:
+        _restore_pause_input()

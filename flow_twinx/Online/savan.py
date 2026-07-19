@@ -3,6 +3,8 @@ import urllib.request
 import urllib.parse
 import urllib.error
 
+from ..imports import config
+
 API_BASE = "https://teenapi.dino.icu/api"
 
 
@@ -24,6 +26,14 @@ def search(query, limit=10):
         primary = r["artists"].get("primary", [])
         artist = primary[0]["name"] if primary else "Unknown"
         out.append((r, f"{name} - {artist}", dur))
+    for entry, title, dur in out:
+        config.dev_print("Savan Search Result", {
+            "title": title,
+            "song_id": entry.get("id"),
+            "duration": f"{dur}s",
+            "album": entry.get("album", {}).get("name"),
+            "download_urls": len(entry.get("downloadUrl", [])),
+        })
     return out
 
 
@@ -40,7 +50,13 @@ def best_url(entry):
                 break
         if best:
             break
-    return best or dls[0]["url"]
+    url = best or dls[0]["url"]
+    config.dev_print("Savan Best URL", {
+        "title": entry.get("name", "Unknown"),
+        "selected_url": url[:80] + "..." if len(url) > 80 else url,
+        "available_qualities": [dl["quality"] for dl in dls],
+    })
+    return url
 
 
 def download(url, dest):

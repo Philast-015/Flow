@@ -1,5 +1,10 @@
 import yt_dlp
 
+from ..imports import config
+
+SEARCH_CACHE_MAX = 5
+_search_cache = {}
+
 BASE_OPTS = {
     "quiet": True,
     "no_warnings": True,
@@ -37,6 +42,9 @@ ydl_opts_play = {
 
 
 def search(query, limit=3):
+    key = f"{query}:{limit}"
+    if key in _search_cache:
+        return _search_cache[key]
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
         if not info.get("entries"):
@@ -46,6 +54,21 @@ def search(query, limit=3):
             title = entry.get("title", "Unknown")
             dur = entry.get("duration", 0)
             results.append((entry, title, dur))
+    _search_cache[key] = results
+    if len(_search_cache) > SEARCH_CACHE_MAX:
+        oldest = next(iter(_search_cache))
+        del _search_cache[oldest]
+    for entry, title, dur in results:
+        config.dev_print("YouTube Search Result", {
+            "title": entry.get("title", "Unknown"),
+            "video_id": entry.get("id"),
+            "url": entry.get("webpage_url") or entry.get("original_url"),
+            "duration": f"{dur}s",
+            "uploader": entry.get("uploader", "Unknown"),
+            "channel_id": entry.get("channel_id"),
+            "view_count": entry.get("view_count"),
+            "upload_date": entry.get("upload_date"),
+        })
     return results
 
 
@@ -53,7 +76,15 @@ def download_url(url, outdir):
     opts = {**ydl_opts_dwn, "outtmpl": f"{outdir}/%(title)s.%(ext)s"}
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
-        return ydl.prepare_filename(info)
+        filename = ydl.prepare_filename(info)
+        config.dev_print("YouTube Download", {
+            "url": url,
+            "title": info.get("title", "Unknown"),
+            "video_id": info.get("id"),
+            "filename": filename,
+            "filesize": info.get("filesize") or info.get("filesize_approx"),
+        })
+        return filename
 
 
 def fetch_radio(query, max_results=30):
@@ -66,6 +97,10 @@ def fetch_radio(query, max_results=30):
             return []
 
     radio_url = f"https://www.youtube.com/watch?v={video_id}&list=RDMM{video_id}"
+    config.dev_print("YouTube Radio Seed", {
+        "seed_video_id": video_id,
+        "radio_url": radio_url,
+    })
     opts = {**ydl_opts_radio, "playlistend": max_results}
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(radio_url, download=False)
@@ -77,9 +112,40 @@ def fetch_radio(query, max_results=30):
             dur = entry.get("duration", 0)
             if vid:
                 results.append((title, vid, dur))
+    config.dev_print("YouTube Radio Tracks", [
+        {"title": t, "video_id": v, "url": f"https://www.youtube.com/watch?v={v}", "duration": f"{d}s"}
+        for t, v, d in results
+    ])
     return results
 
 
 def get_entry(url):
     with yt_dlp.YoutubeDL(ydl_opts_play) as ydl:
-        return ydl.extract_info(url, download=False)
+        entry = ydl.extract_info(url, download=False)
+        if entry:
+            formats_info = []
+            for fmt in entry.get("formats", []):
+                formats_info.append({
+                    "format_id": fmt.get("format_id"),
+                    "ext": fmt.get("ext"),
+                    "acodec": fmt.get("acodec"),
+                    "vcodec": fmt.get("vcodec"),
+                    "url": fmt.get("url", "")[:80] + "..." if fmt.get("url") and len(fmt.get("url", "")) > 80 else fmt.get("url"),
+                })
+            config.dev_print("YouTube Entry (Full)", {
+                "title": entry.get("title"),
+                "video_id": entry.get("id"),
+                "webpage_url": entry.get("webpage_url"),
+                "original_url": entry.get("original_url"),
+                "uploader": entry.get("uploader"),
+                "channel_id": entry.get("channel_id"),
+                "channel_url": entry.get("channel_url"),
+                "duration": f"{entry.get('duration', 0)}s",
+                "view_count": entry.get("view_count"),
+                "like_count": entry.get("like_count"),
+                "upload_date": entry.get("upload_date"),
+                "description": (entry.get("description") or "")[:120],
+                "formats_count": len(entry.get("formats", [])),
+                "formats": formats_info,
+            })
+        return entry

@@ -59,7 +59,8 @@ uv run main.py
 | `-kill` | Kill all background VLC processes                                     |
 | `-i`    | Use it in help command to show detailed help                          |
 | `-s`    | Use it shuffle or play random songs                                   |
-| `-i`    | Use it to repeat songs no of time [ -t n ] [ -t ] ( n = no of times ) |
+| `-r`    | Use it to repeat songs no of time [ -r n ] [ -r ] ( n = no of times ) |
+| `-d`    | Use it to download songs                                              |
 
 ### Shell Mode
 
@@ -102,14 +103,6 @@ flow -dl never gonna give you up    # dl → download
 | `help`                 | Show available commands                           |
 | `help -i`              | Show available commands with detailed explanation |
 
-## Configuration
-
-- Downloads and library are stored in `~/.flow/downloads/`
-- Liked songs (online) are saved to `~/.flow/liked.txt`
-- Liked songs (offline) are copied to `~/.flow/downloads/liked songs/`
-- User shortcuts are stored in `~/.flow/shortcuts.json`
-- Config file: `~/.flow/config.json`
-
 ### Config Options
 
 | Target       | Description                  | Range              |
@@ -123,6 +116,14 @@ flow -dl never gonna give you up    # dl → download
 | `barspacing` | Space between bars           | 0-4                |
 
 Usage: `config <target> <value>`
+
+## Configuration
+
+- Downloads and library are stored in `~/.flow/downloads/`
+- Liked songs (online) are saved to `~/.flow/liked.txt`
+- Liked songs (offline) are copied to `~/.flow/downloads/liked songs/`
+- User shortcuts are stored in `~/.flow/shortcuts.json`
+- Config file: `~/.flow/config.json`
 
 ## Project Structure
 

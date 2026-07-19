@@ -62,6 +62,7 @@ def main():
     parser.add_argument("--play", nargs="+", help="play a song")
     parser.add_argument("--rd", nargs="+", help="play radio mix")
     parser.add_argument("--stop", action="store_true", help="stop background VLC")
+    parser.add_argument("--pause", action="store_true", help="toggle pause on background VLC")
     parser.add_argument(
         "command", nargs="?", default=None, help="subcommand (play, search, list, ...)"
     )
@@ -73,6 +74,21 @@ def main():
     if getattr(args, "stop", False):
         if config.kill_stored():
             print(f"{P}Stopped VLC{R}")
+        else:
+            print(f"{M}No background VLC running{R}")
+        sys.exit(0)
+
+    if getattr(args, "pause", False):
+        import os as _os
+        import signal as _signal
+        pid = config.read_pid()
+        if pid is not None:
+            try:
+                _os.kill(pid, _signal.SIGUSR1)
+                print(f"{P}Toggled pause on background VLC (PID: {pid}){R}")
+            except ProcessLookupError:
+                print(f"{M}No background VLC running{R}")
+                config.clear_pid()
         else:
             print(f"{M}No background VLC running{R}")
         sys.exit(0)
@@ -114,7 +130,6 @@ def main():
         if args.command in SHELL_AUTO_BG:
             args.bg = True
 
-        show_banner()
         try:
             commands.run(args.command, unknown, args)
         except KeyboardInterrupt:

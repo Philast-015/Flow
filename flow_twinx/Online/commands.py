@@ -1,3 +1,5 @@
+import errno
+import fcntl
 import os
 import random
 import signal
@@ -6,7 +8,9 @@ import termios
 import threading
 import time
 
-from .. import shortcuts
+from flow_twinx.config import MAX_SEARCH_RESULTS
+
+from .. import help_detail, shortcuts
 from ..imports import config, merge_flags
 from . import player, savan, youtube
 
@@ -72,6 +76,8 @@ COMMANDS = {
 
 def run(cmd: str, extra: list[str], args):
     cmd = shortcuts.resolve(cmd)
+    inf = "-i" in extra
+    extra = [x for x in extra if x != "-i"]
     extra, args = merge_flags(extra, args)
     if cmd == "play":
         play(extra, args)
@@ -88,7 +94,7 @@ def run(cmd: str, extra: list[str], args):
     elif cmd == "switch":
         switch_mode()
     elif cmd == "help":
-        show_help()
+        show_help(inf)
     elif cmd in ("radio", "rd"):
         radio(extra, args)
     elif cmd == "short":
@@ -116,7 +122,7 @@ def _do_search(query):
     stop = False
     t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
     t.start()
-    _last_results = youtube.search(query)
+    _last_results = youtube.search(query, MAX_SEARCH_RESULTS)
     stop = True
     t.join()
 
@@ -128,6 +134,10 @@ def play(extra: list[str], args):
     arg = " ".join(extra) if extra else None
     if not arg:
         print("No song specified")
+        return
+
+    if getattr(args, "download", False):
+        download(extra)
         return
 
     if arg == "liked":
@@ -332,6 +342,16 @@ def like_track():
     if not url:
         e("     No URL for current song")
         return
+    config.dev_print(
+        "Like Track",
+        {
+            "title": title,
+            "url": url,
+            "video_id": entry.get("id"),
+            "webpage_url": entry.get("webpage_url"),
+            "original_url": entry.get("original_url"),
+        },
+    )
     config.liked_music.parent.mkdir(parents=True, exist_ok=True)
     existing = (
         config.liked_music.read_text().strip().splitlines()
@@ -380,6 +400,15 @@ def radio(extra, args):
         if _radio_tracks and 0 <= idx < len(_radio_tracks):
             title, vid, dur = _radio_tracks[idx]
             url = f"https://www.youtube.com/watch?v={vid}"
+            config.dev_print(
+                "Radio (play by index)",
+                {
+                    "title": title,
+                    "video_id": vid,
+                    "url": url,
+                    "duration": f"{dur}s",
+                },
+            )
             entry = youtube.get_entry(url)
             if getattr(args, "bg", False):
                 if not _fork_bg("Now playing"):
@@ -398,6 +427,15 @@ def radio(extra, args):
         if _radio_tracks and 0 <= idx < len(_radio_tracks):
             title, vid, dur = _radio_tracks[idx]
             url = f"https://www.youtube.com/watch?v={vid}"
+            config.dev_print(
+                "Radio (play by query+index)",
+                {
+                    "title": title,
+                    "video_id": vid,
+                    "url": url,
+                    "duration": f"{dur}s",
+                },
+            )
             entry = youtube.get_entry(url)
             if getattr(args, "bg", False):
                 if not _fork_bg("Now playing"):
@@ -420,6 +458,23 @@ def radio(extra, args):
 
     _radio_tracks = tracks
 
+    if getattr(args, "download", False):
+        for idx, (title, vid, dur) in enumerate(_radio_tracks, 1):
+            url = f"https://www.youtube.com/watch?v={vid}"
+            config.dev_print(
+                "Radio Download",
+                {
+                    "title": title,
+                    "video_id": vid,
+                    "url": url,
+                    "duration": f"{dur}s",
+                    "progress": f"{idx}/{len(_radio_tracks)}",
+                },
+            )
+            filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
+            i(f"    Downloaded ({idx}/{len(_radio_tracks)}): {title}")
+        return
+
     if getattr(args, "shuffle", False):
         random.shuffle(_radio_tracks)
 
@@ -433,17 +488,47 @@ def radio(extra, args):
 
     old_sigint = signal.signal(signal.SIGINT, _radio_sigint)
     old_sigquit = signal.signal(signal.SIGQUIT, _radio_sigquit)
+    old_sigusr1 = signal.getsignal(signal.SIGUSR1)
 
     fd = sys.stdin.fileno()
     old_term = None
+    old_fd_flags = None
     try:
         old_term = termios.tcgetattr(fd)
         new = termios.tcgetattr(fd)
         new[0] &= ~termios.IXON
         new[6][termios.VQUIT] = 0x11  # Ctrl+Q -> SIGQUIT
+        new[6][termios.VSUSP] = 0     # disable Ctrl+Z suspend
         termios.tcsetattr(fd, termios.TCSADRAIN, new)
+        old_fd_flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, old_fd_flags | os.O_NONBLOCK)
     except (termios.error, OSError):
         pass
+
+    def _radio_sigusr1(sig, frame):
+        player._sigusr1_toggle(sig, frame)
+
+    signal.signal(signal.SIGUSR1, _radio_sigusr1)
+    signal.signal(signal.SIGTSTP, signal.SIG_IGN)
+    player._radio_active = True
+
+    def _radio_input_reader():
+        try:
+            while True:
+                try:
+                    ch = os.read(fd, 1)
+                except OSError as ex:
+                    if ex.errno == errno.EAGAIN:
+                        time.sleep(0.05)
+                        continue
+                    break
+                if ch == b"\x10":
+                    os.kill(os.getpid(), signal.SIGUSR1)
+        except OSError:
+            pass
+
+    radio_reader = threading.Thread(target=_radio_input_reader, daemon=True)
+    radio_reader.start()
 
     flags = {"quit": lambda: _radio_quit, "skip": lambda: _radio_skip}
 
@@ -457,6 +542,16 @@ def radio(extra, args):
             while idx < len(_radio_tracks) and not _radio_quit:
                 title, vid, dur = _radio_tracks[idx]
                 url = f"https://www.youtube.com/watch?v={vid}"
+                config.dev_print(
+                    "Radio (playing track)",
+                    {
+                        "title": title,
+                        "video_id": vid,
+                        "url": url,
+                        "duration": f"{dur}s",
+                        "position": f"{idx + 1}/{len(_radio_tracks)}",
+                    },
+                )
                 entry = youtube.get_entry(url)
                 short = _truncate_title(title)
                 mins, secs = divmod(int(dur), 60)
@@ -465,7 +560,7 @@ def radio(extra, args):
                     n_title, n_vid, n_dur = _radio_tracks[idx + 1]
                     n_short = _truncate_title(n_title)
                     n_mins, n_secs = divmod(int(n_dur), 60)
-                    print(f"{T}\n\t⥤ Next: {n_short:30s} {n_mins}:{n_secs:02d}{R}")
+                    print(f"{T}\n\t[⥤ Next: {n_short:30s} {n_mins}:{n_secs:02d}]{R}")
 
                 _radio_skip = False
                 player.play_entry(entry, title, args, flags=flags)
@@ -478,10 +573,17 @@ def radio(extra, args):
     except KeyboardInterrupt:
         _radio_quit = True
     finally:
+        player._radio_active = False
         if old_term is not None:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_term)
+            try:
+                if old_fd_flags is not None:
+                    fcntl.fcntl(fd, fcntl.F_SETFL, old_fd_flags)
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_term)
+            except (termios.error, OSError):
+                pass
         signal.signal(signal.SIGINT, old_sigint)
         signal.signal(signal.SIGQUIT, old_sigquit)
+        signal.signal(signal.SIGUSR1, old_sigusr1)
 
 
 def download(extra: list[str]):
@@ -502,6 +604,15 @@ def download(extra: list[str]):
             e("     No URL found for this entry")
             return
         title = entry.get("title", "Unknown")
+        config.dev_print(
+            "Download (by index)",
+            {
+                "title": title,
+                "url": url,
+                "video_id": entry.get("id"),
+                "output_dir": str(config.DOWNLOAD_DIR),
+            },
+        )
         filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
         i(f"    Downloaded: {title} -> {filepath}")
     else:
@@ -515,6 +626,15 @@ def download(extra: list[str]):
             e("     No URL found for this entry")
             return
         title = entry.get("title", "Unknown")
+        config.dev_print(
+            "Download (by search)",
+            {
+                "title": title,
+                "url": url,
+                "video_id": entry.get("id"),
+                "output_dir": str(config.DOWNLOAD_DIR),
+            },
+        )
         filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
         i(f"    Downloaded: {title} -> {filepath}")
 
@@ -523,21 +643,15 @@ def switch_mode():
     config.Mode = "Offline"
 
 
-def show_help():
-    print(f"{T}Online Commands:{R}")
-    for cmd, desc in COMMANDS.items():
-        print(f"  {T}{cmd:12s}{R} {G}{desc}{R}")
-    print(f"\n{T}Config:{R}")
-    print(f"  {T}config{R}      {G}Configure colors, display mode, bars{R}")
-    print(f"    {G}config help       Show all config targets and colors{R}")
-    print(f"    {G}config display    Set display: none, bars, lyrics{R}")
-    print(f"    {G}config primary    Set primary color (online songs){R}")
-    print(f"    {G}config secondary  Set secondary color (offline songs){R}")
-    print(f"    {G}config tertiary   Set tertiary color (labels){R}")
-    print(f"    {G}config barwidth   Bar count: 4-80 (current: {config.BarWidth}){R}")
-    print(f"    {G}config barheight  Bar height: 2-16 (current: {config.BarHeight}){R}")
-    print(f"    {G}config barspacing 0-4, min, fit, max (current: {config.BarSpacing}){R}")
-    print(f"\n{T}Display Modes:{R}")
-    print(f"  {G}bars{R}   Audio-reactive spectrum analyzer (needs audio output){R}")
-    print(f"  {G}lyrics{R}  Synced lyrics display with colors{R}")
-    print(f"  {G}none{R}   No display during playback{R}")
+def show_help(inf=False):
+    if inf:
+        print(f"{T}Online Commands (detailed):{R}")
+        for cmd, lines in help_detail.ONLINE_HELP.items():
+            for line in lines:
+                print(f"  {line}")
+            print()
+    else:
+        print(f"{T}Online Commands:{R}")
+        for cmd, desc in COMMANDS.items():
+            print(f"  {T}{cmd:12s}{R} {G}{desc}{R}")
+        print(f"{G}  Use 'help -i' for detailed usage{R}")

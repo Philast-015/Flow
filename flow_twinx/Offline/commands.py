@@ -1,7 +1,8 @@
 import os
 import random
-from ..imports import config, merge_flags, is_connected
-from .. import shortcuts
+
+from .. import help_detail, shortcuts
+from ..imports import config, is_connected, merge_flags
 from . import file as lib
 from . import player
 
@@ -31,8 +32,10 @@ def _fork_bg(label):
     os.dup2(devnull, 2)
     return True
 
+
 try:
     import readline
+
     _HAS_READLINE = True
 except ImportError:
     _HAS_READLINE = False
@@ -41,15 +44,15 @@ _last_results = []
 _last_played = None
 
 COMMANDS = {
-    "play":    "Play song(s) from local library | all by play all | and liked",
-    "search":  "Search local music library",
-    "list":    "List local music library",
-    "like":    "Like the currently playing song",
-    "switch":  "Switch to Online mode (checks connection)",
-    "help":    "Show this help message",
-    "short":   "Show/update command shortcuts",
-    "config":  "Change primary/secondary/tertiary colors",
-    "exit":    "Exit Flow",
+    "play": "Play song(s) from local library | all by play all | and liked",
+    "search": "Search local music library",
+    "list": "List local music library",
+    "like": "Like the currently playing song",
+    "switch": "Switch to Online mode (checks connection)",
+    "help": "Show this help message",
+    "short": "Show/update command shortcuts",
+    "config": "Change primary/secondary/tertiary colors",
+    "exit": "Exit Flow",
 }
 
 
@@ -67,10 +70,9 @@ class _Completer:
                 songs = lib.get_song_names()
                 albums = lib.get_album_names()
                 all_names = songs + albums
-                options = sorted(set(
-                    n for n in all_names
-                    if n.lower().startswith(text.lower())
-                ))
+                options = sorted(
+                    set(n for n in all_names if n.lower().startswith(text.lower()))
+                )
             else:
                 options = []
             self.matches = options
@@ -85,12 +87,14 @@ def _setup_completion():
         return
     readline.set_completer(_Completer().complete)
     readline.parse_and_bind("tab: complete")
-    readline.set_completer_delims(' \t\n;')
+    readline.set_completer_delims(" \t\n;")
 
 
 def run(cmd: str, extra: list[str], args):
     _setup_completion()
     cmd = shortcuts.resolve(cmd)
+    inf = "-i" in extra
+    extra = [x for x in extra if x != "-i"]
     extra, args = merge_flags(extra, args)
     if cmd == "play":
         play(extra, args)
@@ -103,7 +107,7 @@ def run(cmd: str, extra: list[str], args):
     elif cmd == "switch":
         switch_mode()
     elif cmd == "help":
-        show_help()
+        show_help(inf)
     elif cmd == "short":
         shortcuts.cmd_short(extra, m)
     elif cmd == "config":
@@ -184,6 +188,7 @@ def _play_liked(args):
     except KeyboardInterrupt:
         pass
 
+
 def _play_all(args):
     global _last_played
     all_songs = lib.get_all_songs()
@@ -211,6 +216,7 @@ def _play_all(args):
                 break
     except KeyboardInterrupt:
         pass
+
 
 def _play_album(album: str, args):
     global _last_played
@@ -295,20 +301,15 @@ def switch_mode():
         e("No internet connection")
 
 
-def show_help():
-    print(f"{T}Offline Commands:{R}")
-    for cmd, desc in COMMANDS.items():
-        print(f"  {T}{cmd:12s}{R} {G}{desc}{R}")
-    print(f"\n{T}Config:{R}")
-    print(f"  {T}config{R}      {G}Configure colors, display mode, bars{R}")
-    print(f"    {G}config help       Show all config targets and colors{R}")
-    print(f"    {G}config display    Set display: none, bars, lyrics{R}")
-    print(f"    {G}config primary    Set primary color (online songs){R}")
-    print(f"    {G}config secondary  Set secondary color (offline songs){R}")
-    print(f"    {G}config tertiary   Set tertiary color (labels){R}")
-    print(f"    {G}config barwidth   Bar count: 4-80 (current: {config.BarWidth}){R}")
-    print(f"    {G}config barheight  Bar height: 2-16 (current: {config.BarHeight}){R}")
-    print(f"    {G}config barspacing 0-4, min, fit, max (current: {config.BarSpacing}){R}")
-    print(f"\n{T}Display Modes:{R}")
-    print(f"  {G}bars{R}   Audio-reactive spectrum analyzer (needs audio output){R}")
-    print(f"  {G}none{R}   No display during playback{R}")
+def show_help(inf=False):
+    if inf:
+        print(f"{T}Offline Commands (detailed):{R}")
+        for cmd, lines in help_detail.OFFLINE_HELP.items():
+            for line in lines:
+                print(f"  {line}")
+            print()
+    else:
+        print(f"{T}Offline Commands:{R}")
+        for cmd, desc in COMMANDS.items():
+            print(f"  {T}{cmd:12s}{R} {G}{desc}{R}")
+        print(f"{G}  Use 'help -i' for detailed usage{R}")
