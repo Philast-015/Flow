@@ -15,6 +15,7 @@ A terminal-based music player with online streaming and offline library modes.
 - **Background play** — Play music in background and return to your shell
 - **Audio-reactive bars** — Real-time spectrum analyzer with configurable width, height, and spacing
 - **Synced lyrics** — Display color-coded lyrics that scroll with the song
+- **Gui for GUI lovers** - Get a gui in web using flask for you to enjoy
 
 ## Requirements
 
@@ -87,6 +88,14 @@ Shell shortcuts use your user-defined shortcuts with `-` prefix:
 ```bash
 flow -svn hello                     # svn → savan
 flow -dl never gonna give you up    # dl → download
+```
+
+### Gui Mode:
+
+To launch gui mode just type :
+
+```bash
+flow --web
 ```
 
 ### Commands

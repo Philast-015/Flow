@@ -1,8 +1,12 @@
+import logging
+
 import yt_dlp
 
 from ..imports import config
 
-SEARCH_CACHE_MAX = 5
+logger = logging.getLogger(__name__)
+
+SEARCH_CACHE_MAX = 50
 _search_cache = {}
 
 BASE_OPTS = {
@@ -10,24 +14,23 @@ BASE_OPTS = {
     "no_warnings": True,
     "noprogress": True,
     "noplaylist": True,
-    "format": "bestaudio/best",
+    "format": "bestaudio*",
     "skip_download": True,
+    "socket_timeout": 10,
+    "retries": 2,
+    "extractor_retries": 2,
 }
 
 ydl_opts = {
     **BASE_OPTS,
     "default_search": "ytsearch1",
+    "extract_flat": True,
 }
 
 ydl_opts_dwn = {
     **BASE_OPTS,
     "skip_download": False,
     "outtmpl": "downloads/%(title)s.%(ext)s",
-}
-
-ydl_opts_search = {
-    **BASE_OPTS,
-    "default_search": "ytsearch1",
 }
 
 ydl_opts_radio = {
@@ -45,15 +48,19 @@ def search(query, limit=3):
     key = f"{query}:{limit}"
     if key in _search_cache:
         return _search_cache[key]
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
-        if not info.get("entries"):
-            return []
-        results = []
-        for entry in info["entries"]:
-            title = entry.get("title", "Unknown")
-            dur = entry.get("duration", 0)
-            results.append((entry, title, dur))
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+    except Exception as exc:
+        logger.warning("Search failed for %r: %s", query, exc)
+        return []
+    if not info or not info.get("entries"):
+        return []
+    results = []
+    for entry in info["entries"]:
+        title = entry.get("title", "Unknown")
+        dur = entry.get("duration", 0)
+        results.append((entry, title, dur))
     _search_cache[key] = results
     if len(_search_cache) > SEARCH_CACHE_MAX:
         oldest = next(iter(_search_cache))
@@ -74,27 +81,35 @@ def search(query, limit=3):
 
 def download_url(url, outdir):
     opts = {**ydl_opts_dwn, "outtmpl": f"{outdir}/%(title)s.%(ext)s"}
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info)
-        config.dev_print("YouTube Download", {
-            "url": url,
-            "title": info.get("title", "Unknown"),
-            "video_id": info.get("id"),
-            "filename": filename,
-            "filesize": info.get("filesize") or info.get("filesize_approx"),
-        })
-        return filename
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+    except Exception as exc:
+        logger.warning("Download failed for %s: %s", url, exc)
+        raise
+    config.dev_print("YouTube Download", {
+        "url": url,
+        "title": info.get("title", "Unknown"),
+        "video_id": info.get("id"),
+        "filename": filename,
+        "filesize": info.get("filesize") or info.get("filesize_approx"),
+    })
+    return filename
 
 
 def fetch_radio(query, max_results=30):
-    with yt_dlp.YoutubeDL(ydl_opts_search) as ydl:
-        info = ydl.extract_info(f"ytsearch1:{query}", download=False)
-        if not info.get("entries"):
-            return []
-        video_id = info["entries"][0].get("id")
-        if not video_id:
-            return []
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+    except Exception as exc:
+        logger.warning("Radio seed search failed for %r: %s", query, exc)
+        return []
+    if not info or not info.get("entries"):
+        return []
+    video_id = info["entries"][0].get("id")
+    if not video_id:
+        return []
 
     radio_url = f"https://www.youtube.com/watch?v={video_id}&list=RDMM{video_id}"
     config.dev_print("YouTube Radio Seed", {
@@ -102,16 +117,20 @@ def fetch_radio(query, max_results=30):
         "radio_url": radio_url,
     })
     opts = {**ydl_opts_radio, "playlistend": max_results}
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(radio_url, download=False)
-        entries = info.get("entries", [])
-        results = []
-        for entry in entries:
-            title = entry.get("title", "Unknown")
-            vid = entry.get("id")
-            dur = entry.get("duration", 0)
-            if vid:
-                results.append((title, vid, dur))
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(radio_url, download=False)
+    except Exception as exc:
+        logger.warning("Radio fetch failed for %s: %s", radio_url, exc)
+        return []
+    entries = info.get("entries", [])
+    results = []
+    for entry in entries:
+        title = entry.get("title", "Unknown")
+        vid = entry.get("id")
+        dur = entry.get("duration", 0)
+        if vid:
+            results.append((title, vid, dur))
     config.dev_print("YouTube Radio Tracks", [
         {"title": t, "video_id": v, "url": f"https://www.youtube.com/watch?v={v}", "duration": f"{d}s"}
         for t, v, d in results
@@ -120,32 +139,36 @@ def fetch_radio(query, max_results=30):
 
 
 def get_entry(url):
-    with yt_dlp.YoutubeDL(ydl_opts_play) as ydl:
-        entry = ydl.extract_info(url, download=False)
-        if entry:
-            formats_info = []
-            for fmt in entry.get("formats", []):
-                formats_info.append({
-                    "format_id": fmt.get("format_id"),
-                    "ext": fmt.get("ext"),
-                    "acodec": fmt.get("acodec"),
-                    "vcodec": fmt.get("vcodec"),
-                    "url": fmt.get("url", "")[:80] + "..." if fmt.get("url") and len(fmt.get("url", "")) > 80 else fmt.get("url"),
-                })
-            config.dev_print("YouTube Entry (Full)", {
-                "title": entry.get("title"),
-                "video_id": entry.get("id"),
-                "webpage_url": entry.get("webpage_url"),
-                "original_url": entry.get("original_url"),
-                "uploader": entry.get("uploader"),
-                "channel_id": entry.get("channel_id"),
-                "channel_url": entry.get("channel_url"),
-                "duration": f"{entry.get('duration', 0)}s",
-                "view_count": entry.get("view_count"),
-                "like_count": entry.get("like_count"),
-                "upload_date": entry.get("upload_date"),
-                "description": (entry.get("description") or "")[:120],
-                "formats_count": len(entry.get("formats", [])),
-                "formats": formats_info,
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts_play) as ydl:
+            entry = ydl.extract_info(url, download=False)
+    except Exception as exc:
+        logger.warning("Failed to get entry for %s: %s", url, exc)
+        return None
+    if entry:
+        formats_info = []
+        for fmt in entry.get("formats", []):
+            formats_info.append({
+                "format_id": fmt.get("format_id"),
+                "ext": fmt.get("ext"),
+                "acodec": fmt.get("acodec"),
+                "vcodec": fmt.get("vcodec"),
+                "url": fmt.get("url", "")[:80] + "..." if fmt.get("url") and len(fmt.get("url", "")) > 80 else fmt.get("url"),
             })
-        return entry
+        config.dev_print("YouTube Entry (Full)", {
+            "title": entry.get("title"),
+            "video_id": entry.get("id"),
+            "webpage_url": entry.get("webpage_url"),
+            "original_url": entry.get("original_url"),
+            "uploader": entry.get("uploader"),
+            "channel_id": entry.get("channel_id"),
+            "channel_url": entry.get("channel_url"),
+            "duration": f"{entry.get('duration', 0)}s",
+            "view_count": entry.get("view_count"),
+            "like_count": entry.get("like_count"),
+            "upload_date": entry.get("upload_date"),
+            "description": (entry.get("description") or "")[:120],
+            "formats_count": len(entry.get("formats", [])),
+            "formats": formats_info,
+        })
+    return entry

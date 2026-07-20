@@ -3,3 +3,4 @@ yt_dlp
 ytmusicapi
 numpy
 sounddevice
+flask

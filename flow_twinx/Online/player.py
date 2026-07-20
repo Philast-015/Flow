@@ -47,7 +47,7 @@ def _setup_pause_input():
         _original_term = termios.tcgetattr(fd)
         new = termios.tcgetattr(fd)
         new[0] &= ~termios.IXON
-        new[6][termios.VSUSP] = 0  # disable Ctrl+Z suspend
+        new[6][termios.VSUSP] = 0
         termios.tcsetattr(fd, termios.TCSADRAIN, new)
     except (termios.error, OSError):
         _original_term = None

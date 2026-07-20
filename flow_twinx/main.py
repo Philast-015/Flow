@@ -62,12 +62,63 @@ def main():
     parser.add_argument("--play", nargs="+", help="play a song")
     parser.add_argument("--rd", nargs="+", help="play radio mix")
     parser.add_argument("--stop", action="store_true", help="stop background VLC")
-    parser.add_argument("--pause", action="store_true", help="toggle pause on background VLC")
+    parser.add_argument(
+        "--pause", action="store_true", help="toggle pause on background VLC"
+    )
+    parser.add_argument(
+        "--web", action="store_true", help="start web server with API and player UI"
+    )
+    parser.add_argument(
+        "--web-stop", action="store_true", help="stop running web server"
+    )
     parser.add_argument(
         "command", nargs="?", default=None, help="subcommand (play, search, list, ...)"
     )
 
     args, unknown = parser.parse_known_args()
+
+    WEB_PID = Path.home() / ".flow/web.pid"
+
+    if getattr(args, "web_stop", False):
+        if WEB_PID.exists():
+            try:
+                import os
+                import signal
+
+                pid = int(WEB_PID.read_text().strip())
+                os.kill(pid, signal.SIGTERM)
+                print(f"{P}Stopped web server (PID: {pid}){R}")
+            except (ProcessLookupError, ValueError):
+                print(f"{M}Web server not running{R}")
+            WEB_PID.unlink(missing_ok=True)
+        else:
+            print(f"{M}Web server not running{R}")
+        sys.exit(0)
+
+    if getattr(args, "web", False):
+        import os
+
+        WEB_PID.parent.mkdir(parents=True, exist_ok=True)
+        from flow_twinx.web.app import app
+
+        if not config.DEV_MODE:
+            pid = os.fork()
+            if pid > 0:
+                WEB_PID.write_text(str(pid))
+                print(f"{P}Flow web server → http://127.0.0.1:5000{R}")
+                return
+            devnull = os.open(os.devnull, os.O_RDWR)
+            os.dup2(devnull, 1)
+            os.dup2(devnull, 2)
+        else:
+            WEB_PID.write_text(str(os.getpid()))
+            print(f"{P}Flow web server → http://127.0.0.1:5000 (dev){R}")
+
+        try:
+            app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)
+        finally:
+            WEB_PID.unlink(missing_ok=True)
+        return
 
     shortcuts.load()
 
@@ -81,6 +132,7 @@ def main():
     if getattr(args, "pause", False):
         import os as _os
         import signal as _signal
+
         pid = config.read_pid()
         if pid is not None:
             try:

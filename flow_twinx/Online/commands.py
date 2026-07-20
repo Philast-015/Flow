@@ -497,8 +497,8 @@ def radio(extra, args):
         old_term = termios.tcgetattr(fd)
         new = termios.tcgetattr(fd)
         new[0] &= ~termios.IXON
-        new[6][termios.VQUIT] = 0x11  # Ctrl+Q -> SIGQUIT
-        new[6][termios.VSUSP] = 0     # disable Ctrl+Z suspend
+        new[6][termios.VQUIT] = 0x11
+        new[6][termios.VSUSP] = 0
         termios.tcsetattr(fd, termios.TCSADRAIN, new)
         old_fd_flags = fcntl.fcntl(fd, fcntl.F_GETFL)
         fcntl.fcntl(fd, fcntl.F_SETFL, old_fd_flags | os.O_NONBLOCK)
