@@ -203,8 +203,6 @@ queueOverlayClose.addEventListener("click", () => {
 function toggleQueueOverlay() {
   const isOpen = queueOverlay.classList.toggle("open");
   queueBarExpand.classList.toggle("open", isOpen);
-  const icon = queueBarExpand.querySelector("i");
-  icon.className = isOpen ? "bi bi-chevron-down" : "bi bi-chevron-up";
 }
 
 function setTab(tab) {
@@ -263,7 +261,7 @@ function loadAndPlay(track) {
   currentTrackType = track.source || "yt";
   let src = "";
   if (currentTrackType === "local") {
-    src = "/local/" + encodeURI(track.path);
+    src = "/local/" + encodeURI(track.path).slice(1);
     track.thumbnail = track.thumbnail || "";
     track.channel = track.channel || track.album || "Local Music";
   } else {
@@ -287,7 +285,7 @@ function loadAndPlay(track) {
   updateActiveCard(track);
   updateMiniPlayer(track);
   updateBg(track.thumbnail);
-  updateQueueBar(track);
+  updateQueueBar();
 
   if (autoPlay && currentTrackType !== "local" && track.video_id) {
     autoLoadRecommendations(track.video_id);
@@ -300,14 +298,14 @@ function setDisplayInfo(track) {
   albumArt.src =
     track.thumbnail && track.thumbnail.trim() !== ""
       ? track.thumbnail
-      : "/static/Frame%201.png";
+      : "/static/Frame%201.jpg";
 }
 
 function updateMiniPlayer(track) {
   miniArt.src =
     track.thumbnail && track.thumbnail.trim() !== ""
       ? track.thumbnail
-      : "/static/Frame%201.png";
+      : "/static/Frame%201.jpg";
   miniTitle.textContent = track.title || "Unknown";
   miniArtist.textContent = track.channel || track.artist || "";
 }
@@ -466,7 +464,7 @@ function clearQueue() {
   renderQueue();
   queueOverlay.classList.remove("open");
   queueBarExpand.classList.remove("open");
-  queueBarExpand.querySelector("i").className = "bi bi-chevron-up";
+  queueBarExpand.querySelector("i").className = "bi bi-list-ul";
 }
 
 
@@ -526,7 +524,7 @@ function createSongCard(data, type) {
   const thumb =
     data.thumbnail && data.thumbnail.trim() !== ""
       ? data.thumbnail
-      : "/static/Frame%201.png";
+      : "/static/Frame%201.jpg";
   card.innerHTML = `
     <img src="${thumb}" alt="" loading="lazy">
     <div class="song-info">
@@ -595,7 +593,7 @@ function renderQueue() {
     const thumb =
       item.thumbnail && item.thumbnail.trim() !== ""
         ? item.thumbnail
-        : "/static/Frame%201.png";
+        : "/static/Frame%201.jpg";
     const dur = item.duration || "";
     card.innerHTML = `
       <img src="${thumb}" alt="" loading="lazy">
@@ -620,32 +618,39 @@ function renderQueue() {
     });
     queueContainer.appendChild(card);
   });
-  updateQueueBarInfo();
+  updateQueueBar();
 }
 
-function updateQueueBar(track) {
-  if (track && queueIndex >= 0 && queue.length > 0) {
-    queueBarTitle.textContent = track.title || "Queue empty";
+function updateQueueBar() {
+  const nextIdx = queueIndex + 1;
+  if (queue.length > 0 && nextIdx < queue.length) {
+    const nextTrack = queue[nextIdx];
+    queueBarTitle.textContent = nextTrack.title || "Unknown";
     const thumb =
-      track.thumbnail && track.thumbnail.trim() !== ""
-        ? track.thumbnail
-        : "/static/Frame%201.png";
+      nextTrack.thumbnail && nextTrack.thumbnail.trim() !== ""
+        ? nextTrack.thumbnail
+        : "/static/Frame%201.jpg";
     queueBarArt.src = thumb;
+  } else if (queue.length > 0) {
+    queueBarTitle.textContent = "End of queue";
+    queueBarArt.src = "/static/Frame%201.jpg";
+  } else {
+    queueBarTitle.textContent = "Queue empty";
+    queueBarArt.src = "/static/Frame%201.jpg";
   }
   updateQueueBarInfo();
 }
 
 function updateQueueBarInfo() {
+  const nextIdx = queueIndex + 1;
   if (queue.length > 0) {
-    const remaining = queue.length - queueIndex - 1;
+    const remaining = queue.length - nextIdx;
     queueBarCount.textContent =
       remaining > 0
         ? `${queue.length} songs \u00b7 ${remaining} next`
         : `${queue.length} song${queue.length !== 1 ? "s" : ""}`;
   } else {
-    queueBarTitle.textContent = "Queue empty";
     queueBarCount.textContent = "";
-    queueBarArt.src = "/static/Frame%201.png";
   }
 }
 

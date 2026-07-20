@@ -1,5 +1,6 @@
 import json
 import logging
+import mimetypes
 import os
 import pathlib
 
@@ -247,11 +248,14 @@ def download():
 @app.route("/local/<path:filepath>")
 def serve_local(filepath):
     p = pathlib.Path(filepath)
+    if not p.is_absolute():
+        p = pathlib.Path("/") / p
     if not p.exists() or not p.is_file():
         return jsonify({"error": "file not found"}), 404
     if p.suffix.lower() not in AUDIO_EXTENSIONS:
         return jsonify({"error": "not an audio file"}), 400
-    return send_file(str(p), mimetype="audio/mpeg", conditional=True)
+    mimetype, _ = mimetypes.guess_type(str(p))
+    return send_file(str(p), mimetype=mimetype or "audio/mpeg", conditional=True)
 
 
 @app.route("/api/albums")

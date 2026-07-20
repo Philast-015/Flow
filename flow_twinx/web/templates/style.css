@@ -1,6 +1,6 @@
 @font-face {
     font-family: "ByteBounce";
-    src: url("/static/ByteBounce.ttf") format("truetype");
+    src: url("/static/font.ttf") format("truetype");
     font-weight: normal;
     font-style: normal;
 }
@@ -692,10 +692,10 @@ body.playing .pixel-wave span:nth-child(16) {
     background: var(--bg3);
     border: 2px solid var(--border);
     color: var(--text2);
-    font-size: var(--font-big);
+    font-size: 15px;
     cursor: pointer;
-    width: 48px;
-    height: 48px;
+    width: 35px;
+    height: 35px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -739,8 +739,8 @@ body.playing .pixel-wave span:nth-child(16) {
 }
 
 .play-btn {
-    width: 72px;
-    height: 72px;
+    width: 50px;
+    height: 50px;
     font-size: 32px;
     background: var(--accent);
     color: var(--shadow);
@@ -899,7 +899,7 @@ body.playing .pixel-wave span:nth-child(16) {
     display: flex;
     align-items: center;
     background: var(--bg3);
-    padding: 0 10px;
+    padding: 0 5px;
     margin-bottom: 10px;
     border: 2px solid var(--surface2);
     transition: border-color 0.15s steps(2);
@@ -912,7 +912,7 @@ body.playing .pixel-wave span:nth-child(16) {
 .search-icon {
     color: var(--text3);
     margin-right: 8px;
-    font-size: 18px;
+    font-size: 15px;
     transition: color 0.15s steps(2);
 }
 
@@ -921,14 +921,14 @@ body.playing .pixel-wave span:nth-child(16) {
 }
 
 .search-bar input {
-    flex: 1;
     background: none;
     border: none;
     color: var(--text);
-    padding: 8px 0;
+    padding: 5px 0;
     font-size: var(--font-big);
     font-family: "ByteBounce", monospace;
     outline: none;
+    max-width: 250px;
 }
 
 .search-bar input::placeholder {
@@ -976,16 +976,15 @@ body.playing .pixel-wave span:nth-child(16) {
 
 .sidebar-tabs {
     display: flex;
-    gap: 2px;
+    gap: 7px;
 }
 
 .tab {
-    flex: 1;
     background: var(--bg3);
-    border: 2px solid var(--surface2);
+    border: 1px solid var(--surface2);
     color: var(--text3);
-    padding: 4px 0;
-    font-size: 22px;
+    padding: 8px;
+    font-size: 15px;
     cursor: pointer;
     transition: all 0.1s steps(2);
     text-align: center;
@@ -994,6 +993,7 @@ body.playing .pixel-wave span:nth-child(16) {
     align-items: center;
     justify-content: center;
     box-shadow: 2px 2px 0 0 var(--shadow);
+    gap: 5px;
 }
 
 .tab:hover {
@@ -1197,8 +1197,8 @@ body.playing .pixel-wave span:nth-child(16) {
     background: var(--bg3);
     border: 2px solid var(--border);
     color: var(--text2);
-    font-size: 24px;
-    padding: 6px 10px;
+    font-size: 1px;
+    padding: 3px 5px;
     cursor: pointer;
     transition: all 0.1s steps(2);
     display: flex;
@@ -1593,41 +1593,50 @@ body.playing .pixel-wave span:nth-child(16) {
 
 #bottomQueue {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 380px;
+    bottom: 16px;
+    left: 16px;
     z-index: 50;
+    width: 320px;
     font-family: "ByteBounce", monospace;
 }
 
 #queueBar {
-    height: 48px;
     background: var(--bg2);
-    border-top: 3px solid var(--border);
+    border: 2px solid var(--border);
+    box-shadow: 4px 4px 0 0 var(--shadow);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 12px;
+    padding: 8px 10px;
     cursor: pointer;
-    transition: background 0.1s steps(2);
-    animation: queueSlideUp 0.3s steps(4) 0.2s both;
+    transition: all 0.1s steps(2);
+    animation: fadeInUp 0.3s steps(4) 0.2s both;
 }
 
 #queueBar:hover {
     background: var(--bg3);
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0 0 var(--shadow);
 }
 
 .queue-bar-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
     flex: 1;
 }
 
+.queue-bar-label {
+    font-size: 18px;
+    color: var(--accent);
+    flex-shrink: 0;
+    margin-right: 2px;
+}
+
 #queueBarArt {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     object-fit: cover;
     flex-shrink: 0;
     border: 2px solid var(--border);
@@ -1638,10 +1647,11 @@ body.playing .pixel-wave span:nth-child(16) {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    line-height: 1.2;
 }
 
 #queueBarTitle {
-    font-size: 24px;
+    font-size: 20px;
     color: var(--text);
     white-space: nowrap;
     overflow: hidden;
@@ -1650,7 +1660,7 @@ body.playing .pixel-wave span:nth-child(16) {
 }
 
 #queueBarCount {
-    font-size: 24px;
+    font-size: 18px;
     color: var(--text3);
     font-family: "ByteBounce", monospace;
 }
@@ -1658,28 +1668,15 @@ body.playing .pixel-wave span:nth-child(16) {
 .queue-bar-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
     flex-shrink: 0;
 }
 
 .autoplay-toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
     cursor: pointer;
     user-select: none;
-}
-
-.autoplay-label {
-    font-size: 22px;
-    color: var(--text3);
-    transition: color 0.15s steps(2);
-    display: flex;
-    align-items: center;
-}
-
-.autoplay-toggle:hover .autoplay-label {
-    color: var(--accent);
 }
 
 #autoPlayToggle {
@@ -1687,8 +1684,8 @@ body.playing .pixel-wave span:nth-child(16) {
 }
 
 .toggle-slider {
-    width: 28px;
-    height: 14px;
+    width: 22px;
+    height: 12px;
     background: var(--surface2);
     border: 2px solid var(--border);
     position: relative;
@@ -1700,8 +1697,8 @@ body.playing .pixel-wave span:nth-child(16) {
     position: absolute;
     top: 1px;
     left: 1px;
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     background: var(--text3);
     transition:
         transform 0.15s steps(2),
@@ -1714,7 +1711,7 @@ body.playing .pixel-wave span:nth-child(16) {
 }
 
 #autoPlayToggle:checked + .toggle-slider::after {
-    transform: translateX(14px);
+    transform: translateX(10px);
     background: var(--text);
 }
 
@@ -1723,14 +1720,13 @@ body.playing .pixel-wave span:nth-child(16) {
     border: 2px solid var(--border);
     color: var(--text3);
     cursor: pointer;
-    font-size: 24px;
-    width: 24px;
-    height: 24px;
+    font-size: 20px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.1s steps(2);
-    animation: chevronBounce 1.5s steps(3) infinite;
     box-shadow: 2px 2px 0 0 var(--shadow);
 }
 
@@ -1741,19 +1737,38 @@ body.playing .pixel-wave span:nth-child(16) {
     box-shadow: 3px 3px 0 0 var(--shadow);
 }
 
-#queueBarExpand.open i {
-    transform: rotate(180deg);
+#queueBarExpand {
+    background: var(--bg3);
+    border: 2px solid var(--border);
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 20px;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s steps(2);
+    box-shadow: 2px 2px 0 0 var(--shadow);
 }
 
-#queueBarExpand i {
-    transition: transform 0.2s steps(3);
+#queueBarExpand:hover {
+    color: var(--text);
+    background: var(--surface);
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 0 var(--shadow);
 }
 
 #queueOverlay {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0;
+    right: 0;
     max-height: 0;
     overflow: hidden;
     background: var(--bg2);
-    border-top: 2px solid var(--border);
+    border: 2px solid var(--border);
+    box-shadow: 4px 4px 0 0 var(--shadow);
     transition: max-height 0.2s steps(4);
 }
 
@@ -1766,7 +1781,7 @@ body.playing .pixel-wave span:nth-child(16) {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px 6px;
+    padding: 8px 10px 6px;
     position: sticky;
     top: 0;
     background: var(--bg2);
@@ -1775,7 +1790,7 @@ body.playing .pixel-wave span:nth-child(16) {
 }
 
 .queue-overlay-title {
-    font-size: 22px;
+    font-size: 20px;
     color: var(--text);
     display: flex;
     align-items: center;
@@ -1784,12 +1799,12 @@ body.playing .pixel-wave span:nth-child(16) {
 
 .queue-overlay-title i {
     color: var(--accent);
-    font-size: 22px;
+    font-size: 20px;
 }
 
 .queue-overlay-actions {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     align-items: center;
 }
 
@@ -1798,7 +1813,7 @@ body.playing .pixel-wave span:nth-child(16) {
     border: 2px solid var(--border);
     color: var(--text3);
     cursor: pointer;
-    font-size: 24px;
+    font-size: 20px;
     width: 24px;
     height: 24px;
     display: flex;
@@ -1821,11 +1836,11 @@ body.playing .pixel-wave span:nth-child(16) {
 }
 
 #queueContainer {
-    padding: 0 10px 10px;
+    padding: 0 8px 8px;
 }
 
 #queueOverlay::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
 
 #queueOverlay::-webkit-scrollbar-track {
@@ -1874,7 +1889,9 @@ body.playing .pixel-wave span:nth-child(16) {
         height: 180px;
     }
     #bottomQueue {
-        right: 0;
+        width: 240px;
+        left: 8px;
+        bottom: 8px;
     }
 }
 

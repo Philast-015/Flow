@@ -79,7 +79,7 @@ BarHeight = 10
 BarSpacing = 1
 
 ####### Be carefull this will make everything print on screen including links title view and all things ###
-DEV_MODE = True
+DEV_MODE = False
 ###########################################################################################################
 
 
