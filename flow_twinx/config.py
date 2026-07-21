@@ -189,7 +189,13 @@ def _save_config():
 
 DOWNLOAD_DIR = pathlib.Path.home() / ".flow/downloads"
 
-VERSION = "0.4.3"
+try:
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _version
+
+    VERSION = _version("flow-twinx")
+except PackageNotFoundError:
+    VERSION = "0.4.6"
 
 Mode = "Online"
 
