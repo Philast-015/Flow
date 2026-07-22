@@ -4,3 +4,4 @@ ytmusicapi
 numpy
 sounddevice
 flask
+psutil

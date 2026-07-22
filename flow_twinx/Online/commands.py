@@ -153,6 +153,7 @@ def play(extra: list[str], args):
             print("Index out of range")
             return
         entry, title, _ = _last_results[idx]
+        entry = _resolve_entry(entry)
         _last_played = (entry, title)
         if getattr(args, "bg", False):
             if not _fork_bg("Now playing"):
@@ -174,6 +175,7 @@ def play(extra: list[str], args):
         try:
             while True:
                 for entry, title, _ in results:
+                    entry = _resolve_entry(entry)
                     _last_played = (entry, title)
                     if getattr(args, "bg", False):
                         if not _fork_bg("Now playing"):
@@ -188,11 +190,24 @@ def play(extra: list[str], args):
             pass
     else:
         entry, title, _ = _last_results[0]
+        entry = _resolve_entry(entry)
         _last_played = (entry, title)
         if getattr(args, "bg", False):
             if not _fork_bg("Now playing"):
                 return
         player.play_entry(entry, title, args)
+
+
+def _resolve_entry(entry):
+    if entry.get("formats"):
+        return entry
+    url = entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
+    if not url and entry.get("id"):
+        url = f"https://www.youtube.com/watch?v={entry['id']}"
+    if not url:
+        return entry
+    full = youtube.get_entry(url)
+    return full if full else entry
 
 
 def _play_liked(args):
@@ -222,6 +237,7 @@ def _play_liked(args):
                     m(f"    Skipping {title} (not found)")
                     continue
                 entry, _, _ = _last_results[0]
+                entry = _resolve_entry(entry)
                 _last_played = (entry, title)
                 player.play_entry(entry, title, args)
             if not repeat:

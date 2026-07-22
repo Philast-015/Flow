@@ -5,6 +5,8 @@ import threading
 import time
 from pathlib import Path
 
+import psutil
+
 if __name__ == "__main__" and __package__ is None:
     __package__ = "flow_twinx"
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -18,6 +20,19 @@ M = config.Muted
 R = config.Reset
 
 SHELL_AUTO_BG = {"radio", "savan"}
+
+
+def kill_port(port):
+    found = False
+    for conn in psutil.net_connections(kind="inet"):
+        if conn.laddr and conn.laddr.port == port:
+            found = True
+            try:
+                proc = psutil.Process(conn.pid)
+                proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                if not found:
+                    print(f"No process found on port {port}")
 
 
 def _spinner(stop):
@@ -83,12 +98,11 @@ def main():
         if WEB_PID.exists():
             try:
                 import os
-                import signal
 
                 pid = int(WEB_PID.read_text().strip())
-                os.kill(pid, signal.SIGTERM)
+                kill_port(5000)
                 print(f"{P}Stopped web server (PID: {pid}){R}")
-            except (ProcessLookupError, ValueError):
+            except ProcessLookupError, ValueError:
                 print(f"{M}Web server not running{R}")
             WEB_PID.unlink(missing_ok=True)
         else:
@@ -96,6 +110,7 @@ def main():
         sys.exit(0)
 
     if getattr(args, "web", False):
+        kill_port(5000)
         import os
 
         WEB_PID.parent.mkdir(parents=True, exist_ok=True)
@@ -214,7 +229,7 @@ def main():
                 if cmd == "switch":
                     commands = _load_commands()
                     show_banner()
-            except (EOFError, KeyboardInterrupt):
+            except EOFError, KeyboardInterrupt:
                 print(f"{M}\nGoodbye!{R}")
                 break
 

@@ -1197,7 +1197,7 @@ body.playing .pixel-wave span:nth-child(16) {
     background: var(--bg3);
     border: 2px solid var(--border);
     color: var(--text2);
-    font-size: 1px;
+    font-size: 15px;
     padding: 3px 5px;
     cursor: pointer;
     transition: all 0.1s steps(2);
@@ -1806,33 +1806,6 @@ body.playing .pixel-wave span:nth-child(16) {
     display: flex;
     gap: 4px;
     align-items: center;
-}
-
-#queueOverlayClose {
-    background: var(--bg3);
-    border: 2px solid var(--border);
-    color: var(--text3);
-    cursor: pointer;
-    font-size: 20px;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.1s steps(2);
-    box-shadow: 2px 2px 0 0 var(--shadow);
-}
-
-#queueOverlayClose:hover {
-    color: var(--text);
-    background: var(--surface);
-    transform: translate(-1px, -1px);
-    box-shadow: 3px 3px 0 0 var(--shadow);
-}
-
-#queueOverlayClose:active {
-    transform: translate(2px, 2px);
-    box-shadow: 0 0 0 0 var(--shadow);
 }
 
 #queueContainer {

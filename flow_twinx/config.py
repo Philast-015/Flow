@@ -138,7 +138,7 @@ def get_bar_spacing():
 
 
 def _load_config():
-    global Primary, Secondary, Tertiary, Display, BarWidth, BarHeight, BarSpacing
+    global Primary, Secondary, Tertiary, Display, BarWidth, BarHeight, BarSpacing, DEV_MODE
     if not CONFIG_FILE.exists():
         return
     try:
@@ -169,7 +169,9 @@ def _load_config():
             and 0 <= data["bar_spacing"] <= 4
         ):
             BarSpacing = data["bar_spacing"]
-    except (json.JSONDecodeError, OSError):
+        if "dev" in data and isinstance(data["dev"], bool):
+            DEV_MODE = data["dev"]
+    except json.JSONDecodeError, OSError:
         pass
 
 
@@ -183,6 +185,7 @@ def _save_config():
         "bar_width": BarWidth,
         "bar_height": BarHeight,
         "bar_spacing": BarSpacing,
+        "dev": DEV_MODE,
     }
     CONFIG_FILE.write_text(json.dumps(data, indent=2))
 
@@ -217,7 +220,7 @@ def read_pid() -> int | None:
         return None
     try:
         return int(PID_FILE.read_text().strip())
-    except (ValueError, OSError):
+    except ValueError, OSError:
         return None
 
 
@@ -242,7 +245,7 @@ def kill_stored():
 
 
 def cmd_config(extra: list[str], args=None):
-    global Primary, Secondary, Tertiary, Display, BarWidth, BarHeight, BarSpacing
+    global Primary, Secondary, Tertiary, Display, BarWidth, BarHeight, BarSpacing, DEV_MODE
     if extra and extra[0] == "help":
         print(f"{Tertiary}Available targets:{Reset}")
         print(f"  {Primary}primary{Reset}   (aliases: pri)")
@@ -335,6 +338,13 @@ def cmd_config(extra: list[str], args=None):
             BarSpacing = v
             _save_config()
             print(f"{Tertiary}Bar spacing changed to {v}{Reset}")
+    elif target == "dev":
+        if value not in ("true", "false"):
+            print("Usage: config dev true/false")
+            return
+        DEV_MODE = value == "true"
+        _save_config()
+        print(f"{Tertiary}Dev mode set to {DEV_MODE}{Reset}")
     else:
         aliases = ", ".join(f"{k}->{v}" for k, v in _TARGET_ALIASES.items())
         print(
