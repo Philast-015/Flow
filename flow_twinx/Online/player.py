@@ -1,6 +1,7 @@
 import errno
 import fcntl
 import os
+import re
 import signal
 import sys
 import termios
@@ -18,6 +19,13 @@ T = config.Tertiary
 M = config.Muted
 E = config.Red
 R = config.Reset
+
+
+def _truncate_title(title):
+    title = re.sub(r"[^A-Za-z0-9\s]", "", title)
+    words = title.split()
+    return " ".join(words[:4]) + "..." if len(words) > 4 else title
+
 
 m = lambda t: print(f"{M}{t}{R}")
 e = lambda t: print(f"{E}{t}{R}")
@@ -49,7 +57,7 @@ def _setup_pause_input():
         new[0] &= ~termios.IXON
         new[6][termios.VSUSP] = 0
         termios.tcsetattr(fd, termios.TCSADRAIN, new)
-    except (termios.error, OSError):
+    except termios.error, OSError:
         _original_term = None
         return
     flags = fcntl.fcntl(fd, fcntl.F_GETFL)
@@ -85,7 +93,7 @@ def _restore_pause_input():
             flags = fcntl.fcntl(fd, fcntl.F_GETFL)
             fcntl.fcntl(fd, fcntl.F_SETFL, flags & ~os.O_NONBLOCK)
             termios.tcsetattr(fd, termios.TCSADRAIN, _original_term)
-        except (termios.error, OSError):
+        except termios.error, OSError:
             pass
         _original_term = None
 
@@ -183,7 +191,7 @@ def play_url(url, title, args=None, duration=0):
 
     dur_min, dur_sec = divmod(int(duration), 60)
     flags = _flags_str(args)
-    i(f"\n[⥤ Now : {title}]")
+    i(f"\n[⥤ Now : {_truncate_title(title)}]")
     m(
         f"    [{dur_min}:{dur_sec:02d}]  {flags}"
         if flags
@@ -240,7 +248,7 @@ def play_entry(entry, title, args=None, flags=None):
 
     dur_min, dur_sec = divmod(int(duration), 60)
     fstr = _flags_str(args)
-    i(f"\n[⥤ Now : {title}]")
+    i(f"\n[⥤ Now : {_truncate_title(title)}]")
     m(
         f"    [{dur_min}:{dur_sec:02d}]  {fstr}"
         if fstr

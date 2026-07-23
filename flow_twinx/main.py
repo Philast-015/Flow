@@ -93,6 +93,7 @@ def main():
     args, unknown = parser.parse_known_args()
 
     WEB_PID = Path.home() / ".flow/web.pid"
+    WEB_PORT = Path.home() / ".flow/web_port"
 
     if getattr(args, "web_stop", False):
         if WEB_PID.exists():
@@ -100,39 +101,57 @@ def main():
                 import os
 
                 pid = int(WEB_PID.read_text().strip())
-                kill_port(5000)
+                port = int(WEB_PORT.read_text().strip()) if WEB_PORT.exists() else 5000
+                kill_port(port)
                 print(f"{P}Stopped web server (PID: {pid}){R}")
             except ProcessLookupError, ValueError:
                 print(f"{M}Web server not running{R}")
             WEB_PID.unlink(missing_ok=True)
+            WEB_PORT.unlink(missing_ok=True)
         else:
             print(f"{M}Web server not running{R}")
         sys.exit(0)
 
     if getattr(args, "web", False):
-        kill_port(5000)
         import os
 
         WEB_PID.parent.mkdir(parents=True, exist_ok=True)
         from flow_twinx.web.app import app
 
+        port = None
+        for p in range(5000, 5006):
+            if not any(
+                c.laddr and c.laddr.port == p
+                for c in psutil.net_connections(kind="inet")
+            ):
+                port = p
+                break
+        if port is None:
+            print(
+                f"{M}All ports 5000-5005 are busy. Pls free your port to use flow web.{R}"
+            )
+            sys.exit(1)
+
         if not config.DEV_MODE:
             pid = os.fork()
             if pid > 0:
                 WEB_PID.write_text(str(pid))
-                print(f"{P}Flow web server → http://127.0.0.1:5000{R}")
+                WEB_PORT.write_text(str(port))
+                print(f"{P}Flow web server → http://127.0.0.1:{port}{R}")
                 return
             devnull = os.open(os.devnull, os.O_RDWR)
             os.dup2(devnull, 1)
             os.dup2(devnull, 2)
         else:
             WEB_PID.write_text(str(os.getpid()))
-            print(f"{P}Flow web server → http://127.0.0.1:5000 (dev){R}")
+            WEB_PORT.write_text(str(port))
+            print(f"{P}Flow web server → http://127.0.0.1:{port} (dev){R}")
 
         try:
-            app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)
+            app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
         finally:
             WEB_PID.unlink(missing_ok=True)
+            WEB_PORT.unlink(missing_ok=True)
         return
 
     shortcuts.load()

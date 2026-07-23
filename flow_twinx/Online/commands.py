@@ -2,6 +2,7 @@ import errno
 import fcntl
 import os
 import random
+import re
 import signal
 import sys
 import termios
@@ -234,7 +235,7 @@ def _play_liked(args):
             for title, url in songs:
                 _do_search(title)
                 if not _last_results:
-                    m(f"    Skipping {title} (not found)")
+                    m(f"    Skipping {_truncate_title(title)} (not found)")
                     continue
                 entry, _, _ = _last_results[0]
                 entry = _resolve_entry(entry)
@@ -302,7 +303,7 @@ def savan_cmd(extra, args):
                 for entry, title, dur in results:
                     url = savan.best_url(entry)
                     if not url:
-                        e(f"No playable URL for {title}, skipping")
+                        e(f"No playable URL for {_truncate_title(title)}, skipping")
                         continue
                     _last_played = (entry, title)
                     if getattr(args, "bg", False):
@@ -345,7 +346,7 @@ def savan_search(query):
         return
     for i, (_, title, dur) in enumerate(_savan_results, 1):
         mins, secs = divmod(int(dur), 60)
-        m(f"  {i}. {title}  ({mins}:{secs:02d})")
+        m(f"  {i}. {_truncate_title(title)}  ({mins}:{secs:02d})")
 
 
 def like_track():
@@ -354,7 +355,9 @@ def like_track():
         e("     No song currently playing")
         return
     entry, title = _last_played
-    url = entry.get("webpage_url") or entry.get("original_url")
+    url = entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
+    if not url and entry.get("id"):
+        url = f"https://www.youtube.com/watch?v={entry['id']}"
     if not url:
         e("     No URL for current song")
         return
@@ -375,11 +378,11 @@ def like_track():
         else []
     )
     if any(title in line for line in existing):
-        m(f"    {title} already liked")
+        m(f"    {_truncate_title(title)} already liked")
         return
     with open(config.liked_music, "a") as f:
         f.write(f"{title}|{url}\n")
-    i(f"    Liked: {title}")
+    i(f"    Liked: {_truncate_title(title)}")
 
 
 def search(query: str):
@@ -391,14 +394,16 @@ def search(query: str):
     if not _last_results:
         print("No results found")
         return
-    for i, (_, title, dur) in enumerate(_last_results, 1):
+    for i, (entry, title, dur) in enumerate(_last_results, 1):
         mins, secs = divmod(int(dur), 60)
-        m(f"  {i}. {title}  ({mins}:{secs:02d})")
+        uploader = entry.get("uploader", "")
+        m(f"  {i}. {_truncate_title(title)}  ({mins}:{secs:02d}) [{uploader}]")
 
 
 def _truncate_title(title):
+    title = re.sub(r"[^A-Za-z0-9\s]", "", title)
     words = title.split()
-    return " ".join(words[:3]) if len(words) > 3 else title
+    return " ".join(words[:4]) + "..." if len(words) > 4 else title
 
 
 def radio(extra, args):
@@ -488,7 +493,7 @@ def radio(extra, args):
                 },
             )
             filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
-            i(f"    Downloaded ({idx}/{len(_radio_tracks)}): {title}")
+            i(f"    Downloaded ({idx}/{len(_radio_tracks)}): {_truncate_title(title)}")
         return
 
     if getattr(args, "shuffle", False):
@@ -518,7 +523,7 @@ def radio(extra, args):
         termios.tcsetattr(fd, termios.TCSADRAIN, new)
         old_fd_flags = fcntl.fcntl(fd, fcntl.F_GETFL)
         fcntl.fcntl(fd, fcntl.F_SETFL, old_fd_flags | os.O_NONBLOCK)
-    except (termios.error, OSError):
+    except termios.error, OSError:
         pass
 
     def _radio_sigusr1(sig, frame):
@@ -595,7 +600,7 @@ def radio(extra, args):
                 if old_fd_flags is not None:
                     fcntl.fcntl(fd, fcntl.F_SETFL, old_fd_flags)
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_term)
-            except (termios.error, OSError):
+            except termios.error, OSError:
                 pass
         signal.signal(signal.SIGINT, old_sigint)
         signal.signal(signal.SIGQUIT, old_sigquit)
@@ -615,7 +620,9 @@ def download(extra: list[str]):
             e("     Index out of range")
             return
         entry, _, _ = _last_results[idx]
-        url = entry.get("webpage_url") or entry.get("original_url")
+        url = entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
+        if not url and entry.get("id"):
+            url = f"https://www.youtube.com/watch?v={entry['id']}"
         if not url:
             e("     No URL found for this entry")
             return
@@ -630,14 +637,16 @@ def download(extra: list[str]):
             },
         )
         filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
-        i(f"    Downloaded: {title} -> {filepath}")
+        i(f"    Downloaded: {_truncate_title(title)} -> {filepath}")
     else:
         _do_search(arg)
         if not _last_results:
             e("     No results found")
             return
         entry, _, _ = _last_results[0]
-        url = entry.get("webpage_url") or entry.get("original_url")
+        url = entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
+        if not url and entry.get("id"):
+            url = f"https://www.youtube.com/watch?v={entry['id']}"
         if not url:
             e("     No URL found for this entry")
             return
@@ -652,7 +661,7 @@ def download(extra: list[str]):
             },
         )
         filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
-        i(f"    Downloaded: {title} -> {filepath}")
+        i(f"    Downloaded: {_truncate_title(title)} -> {filepath}")
 
 
 def switch_mode():

@@ -138,7 +138,15 @@ def get_bar_spacing():
 
 
 def _load_config():
-    global Primary, Secondary, Tertiary, Display, BarWidth, BarHeight, BarSpacing, DEV_MODE
+    global \
+        Primary, \
+        Secondary, \
+        Tertiary, \
+        Display, \
+        BarWidth, \
+        BarHeight, \
+        BarSpacing, \
+        DEV_MODE
     if not CONFIG_FILE.exists():
         return
     try:
@@ -245,7 +253,15 @@ def kill_stored():
 
 
 def cmd_config(extra: list[str], args=None):
-    global Primary, Secondary, Tertiary, Display, BarWidth, BarHeight, BarSpacing, DEV_MODE
+    global \
+        Primary, \
+        Secondary, \
+        Tertiary, \
+        Display, \
+        BarWidth, \
+        BarHeight, \
+        BarSpacing, \
+        DEV_MODE
     if extra and extra[0] == "help":
         print(f"{Tertiary}Available targets:{Reset}")
         print(f"  {Primary}primary{Reset}   (aliases: pri)")

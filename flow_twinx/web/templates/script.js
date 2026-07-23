@@ -46,6 +46,7 @@ const autoPlayToggle = document.getElementById("autoPlayToggle");
 const downloadBtn = document.getElementById("downloadBtn");
 const toastEl = document.getElementById("toast");
 const setDownloadPath = document.getElementById("setDownloadPath");
+const likeBtn = document.getElementById("likeBtn");
 
 let queue = [];
 let queueIndex = -1;
@@ -259,33 +260,34 @@ function updatePlayBtn(playing) {
 function loadAndPlay(track) {
   if (!track) return;
   currentTrackType = track.source || "yt";
-  let src = "";
-  if (currentTrackType === "local") {
-    src = "/local/" + encodeURI(track.path).slice(1);
-    track.thumbnail = track.thumbnail || "";
-    track.channel = track.channel || track.album || "Local Music";
-  } else {
-    src = track.stream_url || `/play?video_id=${track.video_id}`;
-  }
-  audio.src = src;
-  audio.play().catch((e) => {
-    if (track.video_id && currentTrackType !== "local") {
-      fetch(`/play?video_id=${track.video_id}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.stream_url) {
-            audio.src = data.stream_url;
-            audio.play();
-          }
-        });
-    }
-  });
-
   setDisplayInfo(track);
   updateActiveCard(track);
   updateMiniPlayer(track);
   updateBg(track.thumbnail);
   updateQueueBar();
+  checkLiked(track.video_id);
+
+  if (currentTrackType === "local") {
+    let encodedPath = encodeURI(track.path);
+    let src = "/local" + (encodedPath.startsWith("/") ? encodedPath : "/" + encodedPath);
+    track.thumbnail = track.thumbnail || "";
+    track.channel = track.channel || track.album || "Local Music";
+    audio.src = src;
+    audio.play().catch(() => {});
+  } else if (track.stream_url) {
+    audio.src = track.stream_url;
+    audio.play().catch(() => {});
+  } else if (track.video_id) {
+    fetch(`/play?video_id=${track.video_id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.stream_url) {
+          track.stream_url = data.stream_url;
+          audio.src = data.stream_url;
+          audio.play().catch(() => {});
+        }
+      });
+  }
 
   if (autoPlay && currentTrackType !== "local" && track.video_id) {
     autoLoadRecommendations(track.video_id);
@@ -485,7 +487,8 @@ function searchYouTube(query) {
         });
         resultsContainer.appendChild(card);
       });
-    });
+    })
+    .catch(() => {});
 }
 
 function searchLocal(query) {
@@ -512,7 +515,8 @@ function searchLocal(query) {
         });
         resultsContainer.appendChild(card);
       });
-    });
+    })
+    .catch(() => {});
 }
 
 function createSongCard(data, type) {
@@ -684,7 +688,8 @@ function scanLocal() {
         channel: "Local Files",
       }));
       loadLocalTracks();
-    });
+    })
+    .catch(() => {});
   fetch("/api/albums")
     .then((r) => r.json())
     .then((data) => {
@@ -699,7 +704,8 @@ function scanLocal() {
         card.addEventListener("click", () => showAlbumSongs(album));
         albumsGrid.appendChild(card);
       });
-    });
+    })
+    .catch(() => {});
 }
 
 function showAlbumSongs(album) {
@@ -728,7 +734,8 @@ function showAlbumSongs(album) {
         });
         albumSongs.appendChild(card);
       });
-    });
+    })
+    .catch(() => {});
 }
 
 function loadLocalTracks() {
@@ -793,11 +800,12 @@ function loadLiked() {
         });
         container.appendChild(card);
       });
-      if (ids.length > 0 && songs.length === 0) {
-        ids.forEach((vid) => {
+      const entries = data.liked_entries || [];
+      if (entries.length > 0 && songs.length === 0) {
+        entries.forEach((entry) => {
           const item = {
-            video_id: vid,
-            title: vid,
+            video_id: entry.video_id,
+            title: entry.title || entry.video_id,
             source: "yt",
             channel: "Liked",
             thumbnail: "",
@@ -813,7 +821,8 @@ function loadLiked() {
           container.appendChild(card);
         });
       }
-    });
+    })
+    .catch(() => {});
 }
 
 
@@ -980,6 +989,50 @@ function downloadTrack() {
 }
 
 downloadBtn.addEventListener("click", downloadTrack);
+
+let currentLiked = false;
+
+function checkLiked(videoId) {
+  if (!videoId) {
+    currentLiked = false;
+    likeBtn.querySelector("i").className = "bi bi-heart";
+    return;
+  }
+  fetch(`/api/is-liked?video_id=${encodeURIComponent(videoId)}`)
+    .then((r) => r.json())
+    .then((data) => {
+      currentLiked = data.liked || false;
+      likeBtn.querySelector("i").className = currentLiked
+        ? "bi bi-heart-fill"
+        : "bi bi-heart";
+    })
+    .catch(() => {});
+}
+
+function toggleLike() {
+  if (queueIndex < 0 || !queue[queueIndex]) return;
+  var track = queue[queueIndex];
+  var vid = track.video_id;
+  if (!vid) {
+    showToast("Cannot like local tracks");
+    return;
+  }
+  fetch("/api/like", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ video_id: vid, title: track.title || "Unknown" }),
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      currentLiked = data.liked;
+      likeBtn.querySelector("i").className = currentLiked
+        ? "bi bi-heart-fill"
+        : "bi bi-heart";
+      showToast(currentLiked ? "Liked" : "Removed from liked");
+    });
+}
+
+likeBtn.addEventListener("click", toggleLike);
 
 function goFull() {
   miniPlayer.style.display = "none";
