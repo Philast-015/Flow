@@ -31,7 +31,6 @@ ydl_opts_dwn = {
     **BASE_OPTS,
     "skip_download": False,
     "outtmpl": "downloads/%(title).50B.%(ext)s",
-    "writethumbnail": True,
 }
 
 ydl_opts_radio = {
@@ -72,7 +71,14 @@ def search(query, limit=3):
             {
                 "title": entry.get("title", "Unknown"),
                 "video_id": entry.get("id"),
-                "url": entry.get("webpage_url") or entry.get("original_url") or entry.get("url") or (f"https://www.youtube.com/watch?v={entry['id']}" if entry.get("id") else None),
+                "url": entry.get("webpage_url")
+                or entry.get("original_url")
+                or entry.get("url")
+                or (
+                    f"https://www.youtube.com/watch?v={entry['id']}"
+                    if entry.get("id")
+                    else None
+                ),
                 "duration": f"{dur}s",
                 "uploader": entry.get("uploader", "Unknown"),
                 "channel_id": entry.get("channel_id"),
@@ -83,8 +89,10 @@ def search(query, limit=3):
     return results
 
 
-def download_url(url, outdir):
+def download_url(url, outdir, fmt=None):
     opts = {**ydl_opts_dwn, "outtmpl": f"{outdir}/%(title).50B.%(ext)s"}
+    if fmt and fmt != "webm":
+        opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": fmt}]
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)

@@ -1,5 +1,7 @@
 import json
 import pathlib
+import re
+import shutil
 
 CONFIG_FILE = pathlib.Path.home() / ".flow/config.json"
 
@@ -82,6 +84,10 @@ BarSpacing = 1
 DEV_MODE = False
 ###########################################################################################################
 
+FFMPEG = False
+FORMAT = "webm"
+_VALID_FORMATS = {"opus", "m4a", "mp3", "webm"}
+
 
 def dev_print(label: str, data: dict | list | str | None = None):
     if not DEV_MODE:
@@ -137,6 +143,76 @@ def get_bar_spacing():
     return int(BarSpacing)
 
 
+def _detect_ffmpeg():
+    return shutil.which("ffmpeg") is not None
+
+
+def check_deps():
+    def _try_import(name):
+        try:
+            __import__(name)
+            return True
+        except ImportError:
+            return False
+
+    deps = [
+        ("ffmpeg", shutil.which("ffmpeg") is not None),
+        ("vlc", _try_import("vlc")),
+        ("yt-dlp", _try_import("yt_dlp")),
+        ("psutil", _try_import("psutil")),
+    ]
+    print(f"  | {'dep':10s} | {'status':13s} | {'test':6s} |")
+    print(f"  | {'─' * 10} | {'─' * 13} | {'─' * 6} |")
+    for name, ok in deps:
+        status = "installed" if ok else "not installed"
+        test = "passed" if ok else "failed"
+        print(f"  | {name:10s} | {status:13s} | {test:6s} |")
+
+
+FILLER_WORDS = {
+    "official",
+    "officials",
+    "video",
+    "videos",
+    "music",
+    "audio",
+    "lyrics",
+    "lyric",
+    "hd",
+    "hq",
+    "4k",
+    "full",
+    "song",
+    "songs",
+    "ft",
+    "feat",
+    "featuring",
+    "remix",
+    "cover",
+    "live",
+    "version",
+    "original",
+    "new",
+    "latest",
+    "trailer",
+    "teaser",
+    "release",
+    "mv",
+    "visualizer",
+    "explicit",
+    "clip",
+    "old",
+}
+
+
+def _truncate_title(title):
+    title = re.sub(r"[^A-Za-z0-9\s]", "", title)
+
+    words = [word for word in title.split() if word.lower() not in FILLER_WORDS]
+
+    return " ".join(words[:4]) + "..." if len(words) > 4 else " ".join(words)
+
+
 def _load_config():
     global \
         Primary, \
@@ -146,7 +222,11 @@ def _load_config():
         BarWidth, \
         BarHeight, \
         BarSpacing, \
-        DEV_MODE
+        DEV_MODE, \
+        FFMPEG, \
+        FORMAT, \
+        MAX_SEARCH_RESULTS, \
+        MAX_RESULTS_RADIO
     if not CONFIG_FILE.exists():
         return
     try:
@@ -179,6 +259,14 @@ def _load_config():
             BarSpacing = data["bar_spacing"]
         if "dev" in data and isinstance(data["dev"], bool):
             DEV_MODE = data["dev"]
+        if "ffmpeg" in data and isinstance(data["ffmpeg"], bool):
+            FFMPEG = data["ffmpeg"]
+        if "format" in data and data["format"] in _VALID_FORMATS:
+            FORMAT = data["format"]
+        if "max_search" in data and isinstance(data["max_search"], int) and 1 <= data["max_search"] <= 20:
+            MAX_SEARCH_RESULTS = data["max_search"]
+        if "max_radio" in data and isinstance(data["max_radio"], int) and 1 <= data["max_radio"] <= 50:
+            MAX_RESULTS_RADIO = data["max_radio"]
     except json.JSONDecodeError, OSError:
         pass
 
@@ -194,6 +282,10 @@ def _save_config():
         "bar_height": BarHeight,
         "bar_spacing": BarSpacing,
         "dev": DEV_MODE,
+        "ffmpeg": FFMPEG,
+        "format": FORMAT,
+        "max_search": MAX_SEARCH_RESULTS,
+        "max_radio": MAX_RESULTS_RADIO,
     }
     CONFIG_FILE.write_text(json.dumps(data, indent=2))
 
@@ -261,8 +353,12 @@ def cmd_config(extra: list[str], args=None):
         BarWidth, \
         BarHeight, \
         BarSpacing, \
-        DEV_MODE
-    if extra and extra[0] == "help":
+        DEV_MODE, \
+        FFMPEG, \
+        FORMAT, \
+        MAX_SEARCH_RESULTS, \
+        MAX_RESULTS_RADIO
+    if extra and (extra[0] in ("help", "-h")):
         print(f"{Tertiary}Available targets:{Reset}")
         print(f"  {Primary}primary{Reset}   (aliases: pri)")
         print(f"  {Secondary}secondary{Reset} (aliases: sec)")
@@ -271,6 +367,9 @@ def cmd_config(extra: list[str], args=None):
         print(f"  {Grey}barwidth{Reset}   (4-80, current: {BarWidth})")
         print(f"  {Grey}barheight{Reset}  (2-24, current: {BarHeight})")
         print(f"  {Grey}barspacing{Reset} (0-4, min, fit, max — current: {BarSpacing})")
+        print(f"  {Grey}format{Reset}     (opus, m4a, mp3, webm — current: {FORMAT})")
+        print(f"  {Grey}max_search{Reset} (1-20, current: {MAX_SEARCH_RESULTS})")
+        print(f"  {Grey}max_radio{Reset}  (1-50, current: {MAX_RESULTS_RADIO})")
         print(f"\n{Tertiary}Available colors:{Reset}")
         for name, code in _COLORS.items():
             print(f"  {code}{name}{Reset}")
@@ -361,6 +460,42 @@ def cmd_config(extra: list[str], args=None):
         DEV_MODE = value == "true"
         _save_config()
         print(f"{Tertiary}Dev mode set to {DEV_MODE}{Reset}")
+    elif target == "format":
+        if value not in _VALID_FORMATS:
+            print(f"Unknown format '{value}'. Options: opus, m4a, mp3, webm")
+            return
+        FORMAT = value
+        if FORMAT != "webm" and not FFMPEG:
+            print(
+                f"{YELLOW}ffmpeg not found. Install ffmpeg to use {FORMAT} format.{Reset}\n"
+                f"{Grey}  Defaulting to webm until ffmpeg is installed.{Reset}"
+            )
+        _save_config()
+        print(f"{Tertiary}Default download format changed to {value}{Reset}")
+    elif target in ("max_search", "maxresults"):
+        try:
+            v = int(extra[1])
+        except ValueError:
+            print("max_search must be an integer (1-20)")
+            return
+        if not (1 <= v <= 20):
+            print("max_search must be between 1 and 20")
+            return
+        MAX_SEARCH_RESULTS = v
+        _save_config()
+        print(f"{Tertiary}Max search results changed to {v}{Reset}")
+    elif target in ("max_radio", "maxradio"):
+        try:
+            v = int(extra[1])
+        except ValueError:
+            print("max_radio must be an integer (1-50)")
+            return
+        if not (1 <= v <= 50):
+            print("max_radio must be between 1 and 50")
+            return
+        MAX_RESULTS_RADIO = v
+        _save_config()
+        print(f"{Tertiary}Max radio tracks changed to {v}{Reset}")
     else:
         aliases = ", ".join(f"{k}->{v}" for k, v in _TARGET_ALIASES.items())
         print(
@@ -369,3 +504,6 @@ def cmd_config(extra: list[str], args=None):
 
 
 _load_config()
+
+FFMPEG = _detect_ffmpeg()
+_save_config()

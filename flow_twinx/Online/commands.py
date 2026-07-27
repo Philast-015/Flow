@@ -2,17 +2,15 @@ import errno
 import fcntl
 import os
 import random
-import re
 import signal
 import sys
 import termios
 import threading
 import time
 
-from flow_twinx.config import MAX_SEARCH_RESULTS
-
-from .. import help_detail, shortcuts
+from .. import help_detail, playlist, shortcuts
 from ..imports import config, merge_flags
+from ..Offline import player as off_player
 from . import player, savan, youtube
 
 P = config.Primary
@@ -64,13 +62,15 @@ COMMANDS = {
     "search": "Search YouTube for tracks",
     "savan": "Play a song from JioSaavn (alias: svn)",
     "savan-s": "Search JioSaavn for tracks (alias: svn-s)",
-    "radio": "Generate a radio mix | radio <song> [index] to play specific track",
+    "radio": "Generate a mix | radio <song> [index] | -p save as playlist | -d download",
     "like": "Like a song",
-    "download": "Download audio from YouTube",
+    "download": "Download audio from YouTube | -f <format> (opus, m4a, mp3, webm)",
+    "playlist": "Manage playlists (alias: plist)",
     "switch": "Switch to Offline mode",
     "help": "Show this help message",
     "short": "Show/update command shortcuts",
-    "config": "Change primary/secondary/tertiary colors",
+    "config": "Change primary/secondary/tertiary colors, format, display",
+    "check": "Check all dependencies (ffmpeg, vlc, yt-dlp, psutil)",
     "exit": "Exit Flow",
 }
 
@@ -79,7 +79,18 @@ def run(cmd: str, extra: list[str], args):
     cmd = shortcuts.resolve(cmd)
     inf = "-i" in extra
     extra = [x for x in extra if x != "-i"]
-    extra, args = merge_flags(extra, args)
+    playlist_name = None
+    if "-p" in extra:
+        pi = extra.index("-p")
+        extra = extra[:pi] + extra[pi + 1 :]
+        if extra and not extra[0].startswith("-"):
+            playlist_name = extra.pop(0)
+        setattr(args, "save_playlist", playlist_name or True)
+    extra, args = (
+        merge_flags(extra, args)
+        if cmd not in ("config", "check", "short")
+        else (extra, args)
+    )
     if cmd == "play":
         play(extra, args)
     elif cmd == "search":
@@ -98,23 +109,27 @@ def run(cmd: str, extra: list[str], args):
         show_help(inf)
     elif cmd in ("radio", "rd"):
         radio(extra, args)
+    elif cmd in ("playlist", "plist"):
+        playlist_cmd(extra, args)
     elif cmd == "short":
         shortcuts.cmd_short(extra, m)
     elif cmd == "config":
         config.cmd_config(extra, args)
+    elif cmd == "check":
+        config.check_deps()
     else:
         print(f"Unknown command: {cmd}")
 
 
-def _spinner(stop):
+def _spinner(stop, label="Searching"):
     chars = "|/-\\"
     i = 0
     while not stop():
-        sys.stdout.write(f"\r{P}Searching... {chars[i]}{R}")
+        sys.stdout.write(f"\r{P}{label}... {chars[i]}{R}")
         sys.stdout.flush()
         time.sleep(0.1)
         i = (i + 1) % len(chars)
-    sys.stdout.write("\r" + " " * 40 + "\r")
+    sys.stdout.write("\r" + " " * 50 + "\r")
     sys.stdout.flush()
 
 
@@ -123,7 +138,7 @@ def _do_search(query):
     stop = False
     t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
     t.start()
-    _last_results = youtube.search(query, MAX_SEARCH_RESULTS)
+    _last_results = youtube.search(query, config.MAX_SEARCH_RESULTS)
     stop = True
     t.join()
 
@@ -400,10 +415,7 @@ def search(query: str):
         m(f"  {i}. {_truncate_title(title)}  ({mins}:{secs:02d}) [{uploader}]")
 
 
-def _truncate_title(title):
-    title = re.sub(r"[^A-Za-z0-9\s]", "", title)
-    words = title.split()
-    return " ".join(words[:4]) + "..." if len(words) > 4 else title
+_truncate_title = config._truncate_title
 
 
 def radio(extra, args):
@@ -479,22 +491,23 @@ def radio(extra, args):
 
     _radio_tracks = tracks
 
-    if getattr(args, "download", False):
-        for idx, (title, vid, dur) in enumerate(_radio_tracks, 1):
+    save_pl = getattr(args, "save_playlist", None)
+    if save_pl is not True:
+        pl_name = save_pl if isinstance(save_pl, str) else tracks[0][0]
+    else:
+        pl_name = tracks[0][0]
+    if save_pl:
+        for title, vid, dur in _radio_tracks:
             url = f"https://www.youtube.com/watch?v={vid}"
-            config.dev_print(
-                "Radio Download",
-                {
-                    "title": title,
-                    "video_id": vid,
-                    "url": url,
-                    "duration": f"{dur}s",
-                    "progress": f"{idx}/{len(_radio_tracks)}",
-                },
-            )
-            filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
-            i(f"    Downloaded ({idx}/{len(_radio_tracks)}): {_truncate_title(title)}")
-        return
+            playlist.add_song(pl_name, title, vid, url)
+        i(f"    Saved {len(_radio_tracks)} tracks to playlist: {pl_name}")
+        if not getattr(args, "download", False):
+            return
+
+    if getattr(args, "download", False):
+        dl_dir = playlist.download_dir(pl_name) if save_pl else config.DOWNLOAD_DIR
+    else:
+        dl_dir = None
 
     if getattr(args, "shuffle", False):
         random.shuffle(_radio_tracks)
@@ -584,7 +597,14 @@ def radio(extra, args):
                     print(f"{T}\n\t[⥤ Next: {n_short:30s} {n_mins}:{n_secs:02d}]{R}")
 
                 _radio_skip = False
-                player.play_entry(entry, title, args, flags=flags)
+                if dl_dir:
+                    filepath = youtube.download_url(url, dl_dir)
+                    i(
+                        f"    Downloaded ({idx + 1}/{len(_radio_tracks)}): {_truncate_title(title)}"
+                    )
+                    off_player.play_file(filepath, title, args)
+                else:
+                    player.play_entry(entry, title, args, flags=flags)
                 idx += 1
             if not repeat or _radio_quit:
                 break
@@ -609,11 +629,31 @@ def radio(extra, args):
 
 def download(extra: list[str]):
     global _last_results
+    fmt = None
+    if "-f" in extra:
+        fi = extra.index("-f")
+        if fi + 1 < len(extra):
+            fmt = extra[fi + 1].lower()
+            extra = extra[:fi] + extra[fi + 2 :]
+        else:
+            e("Usage: download <query> -f <format>")
+            return
+    if fmt and fmt not in ("opus", "m4a", "mp3", "webm"):
+        e("Unknown format. Options: opus, m4a, mp3, webm")
+        return
+    if not fmt:
+        fmt = config.FORMAT
+    if fmt != "webm" and not config.FFMPEG:
+        e(f"ffmpeg not found. Cannot convert to {fmt}. Install ffmpeg or use webm.")
+        return
+
     arg = " ".join(extra) if extra else None
     if not arg:
         e("No song specified")
         return
 
+    url = None
+    title = "Unknown"
     if arg.isdigit():
         idx = int(arg) - 1
         if idx < 0 or idx >= len(_last_results):
@@ -623,21 +663,7 @@ def download(extra: list[str]):
         url = entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
         if not url and entry.get("id"):
             url = f"https://www.youtube.com/watch?v={entry['id']}"
-        if not url:
-            e("     No URL found for this entry")
-            return
         title = entry.get("title", "Unknown")
-        config.dev_print(
-            "Download (by index)",
-            {
-                "title": title,
-                "url": url,
-                "video_id": entry.get("id"),
-                "output_dir": str(config.DOWNLOAD_DIR),
-            },
-        )
-        filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
-        i(f"    Downloaded: {_truncate_title(title)} -> {filepath}")
     else:
         _do_search(arg)
         if not _last_results:
@@ -647,25 +673,156 @@ def download(extra: list[str]):
         url = entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
         if not url and entry.get("id"):
             url = f"https://www.youtube.com/watch?v={entry['id']}"
-        if not url:
-            e("     No URL found for this entry")
-            return
         title = entry.get("title", "Unknown")
-        config.dev_print(
-            "Download (by search)",
-            {
-                "title": title,
-                "url": url,
-                "video_id": entry.get("id"),
-                "output_dir": str(config.DOWNLOAD_DIR),
-            },
-        )
-        filepath = youtube.download_url(url, config.DOWNLOAD_DIR)
-        i(f"    Downloaded: {_truncate_title(title)} -> {filepath}")
+
+    if not url:
+        e("     No URL found for this entry")
+        return
+
+    label = f"Downloading: {_truncate_title(title)}"
+    if fmt != "webm":
+        label += f" → {fmt}"
+    stop = False
+    t = threading.Thread(target=_spinner, args=(lambda: stop, label), daemon=True)
+    t.start()
+    try:
+        filepath = youtube.download_url(url, config.DOWNLOAD_DIR, fmt=fmt)
+    finally:
+        stop = True
+        t.join()
+    if fmt != "webm":
+        i(f"    Converted to {fmt}: {_truncate_title(title)}")
+    else:
+        i(f"    Downloaded: {_truncate_title(title)}")
 
 
 def switch_mode():
     config.Mode = "Offline"
+
+
+def playlist_cmd(extra, args):
+    if not extra:
+        names = playlist.list_all()
+        if not names:
+            m("No playlists")
+            return
+        i("Playlists:")
+        for name in names:
+            songs = playlist.get(name)
+            m(f"  {name}  ({len(songs)} songs)")
+        return
+
+    subcmd = playlist.resolve_subcmd(extra[0])
+
+    if subcmd == "create":
+        if len(extra) < 2:
+            e("Usage: playlist create <name>")
+            return
+        name = " ".join(extra[1:])
+        if playlist.create(name):
+            i(f"Created playlist: {name}")
+        else:
+            m(f"Playlist '{name}' already exists")
+
+    elif subcmd == "delete":
+        if len(extra) < 2:
+            e("Usage: playlist delete <name>")
+            return
+        name = " ".join(extra[1:])
+        if playlist.delete(name):
+            i(f"Deleted playlist: {name}")
+        else:
+            m(f"Playlist '{name}' not found")
+
+    elif subcmd == "add":
+        if len(extra) < 3:
+            e("Usage: playlist add <name> <index_or_query>")
+            return
+        name = extra[1]
+        target = extra[2]
+        if target.isdigit():
+            idx = int(target) - 1
+            if idx < 0 or idx >= len(_last_results):
+                e("Index out of range")
+                return
+            entry, title, _ = _last_results[idx]
+            vid = entry.get("id", "")
+            url = (
+                entry.get("webpage_url")
+                or entry.get("url")
+                or f"https://www.youtube.com/watch?v={vid}"
+            )
+            playlist.add_song(name, title, vid, url)
+            i(f"Added: {_truncate_title(title)} to {name}")
+        else:
+            query = " ".join(extra[2:])
+            _do_search(query)
+            if not _last_results:
+                e("No results found")
+                return
+            entry, title, _ = _last_results[0]
+            vid = entry.get("id", "")
+            url = (
+                entry.get("webpage_url")
+                or entry.get("url")
+                or f"https://www.youtube.com/watch?v={vid}"
+            )
+            playlist.add_song(name, title, vid, url)
+            i(f"Added: {_truncate_title(title)} to {name}")
+
+    elif subcmd == "remove":
+        if len(extra) < 3:
+            e("Usage: playlist remove <name> <index_or_name>")
+            return
+        name = extra[1]
+        target = " ".join(extra[2:])
+        if target.isdigit():
+            ok, msg = playlist.remove_song(name, index=int(target) - 1)
+        else:
+            ok, msg = playlist.remove_song(name, title_match=target)
+        if ok:
+            i(f"Removed: {msg} from {name}")
+        else:
+            e(f"     {msg}")
+
+    elif subcmd == "list":
+        if len(extra) < 2:
+            e("Usage: playlist list <name>")
+            return
+        name = extra[1]
+        songs = playlist.get(name)
+        if not songs:
+            m(f"Playlist '{name}' is empty or not found")
+            return
+        i(f"  {name}:")
+        for idx, s in enumerate(songs, 1):
+            m(f"  {idx}. {_truncate_title(s['title'])}")
+
+    else:
+        name = extra[0]
+        songs = playlist.get(name)
+        if not songs:
+            m(f"Playlist '{name}' is empty or not found")
+            return
+        if getattr(args, "download", False):
+            dl_dir = playlist.download_dir(name)
+            i(f"    Downloading {len(songs)} songs to {dl_dir}...")
+            for idx, s in enumerate(songs, 1):
+                vid = s.get("video_id", "")
+                url = s.get("url") or f"https://www.youtube.com/watch?v={vid}"
+                try:
+                    youtube.download_url(url, dl_dir)
+                    i(
+                        f"    Downloaded ({idx}/{len(songs)}): {_truncate_title(s['title'])}"
+                    )
+                except Exception as exc:
+                    e(
+                        f"     Failed ({idx}/{len(songs)}): {_truncate_title(s['title'])} - {exc}"
+                    )
+            return
+        i(f"  {name}:")
+        for idx, s in enumerate(songs, 1):
+            m(f"  {idx}. {_truncate_title(s['title'])}")
 
 
 def show_help(inf=False):

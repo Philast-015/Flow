@@ -143,23 +143,6 @@ def _cached_search(query, limit):
     devlog.log_info(
         "FETCH", 200, "/search", "yt_dlp", f"query={query} {len(results)} results"
     )
-    devlog.log_detail(
-        {
-            "query": query,
-            "limit": limit,
-            "results": len(results),
-            "songs": [
-                {
-                    "title": r["title"],
-                    "video_id": r["video_id"],
-                    "channel": r["channel"],
-                }
-                for r in results
-            ],
-        },
-        source="yt_dlp",
-        label="search",
-    )
     _search_cache[key] = results
     if len(_search_cache) > SEARCH_CACHE_MAX:
         del _search_cache[next(iter(_search_cache))]
@@ -178,6 +161,7 @@ def _fetch_radio(video_id, max_results=30):
                     "title": e.get("title", "Unknown"),
                     "video_id": e["id"],
                     "duration": e.get("duration", 0),
+                    "thumbnail": _get_thumbnail(e),
                 }
                 for e in entries
                 if e.get("id")
@@ -189,25 +173,7 @@ def _fetch_radio(video_id, max_results=30):
                 "yt_dlp",
                 f"radio vid={video_id} {len(tracks)} tracks",
             )
-            devlog.log_detail(
-                {
-                    "video_id": video_id,
-                    "url": radio_url,
-                    "total_tracks": len(tracks),
-                    "tracks": tracks,
-                },
-                source="yt_dlp",
-                label="radio",
-            )
-            return [
-                {
-                    "title": t["title"],
-                    "video_id": t["video_id"],
-                    "duration": t["duration"],
-                    "thumbnail": _get_thumbnail(e),
-                }
-                for e, t in zip(entries, tracks)
-            ]
+            return tracks
     except Exception as exc:
         devlog.log_error(
             "FETCH", 500, "/recommend", "yt_dlp", f"radio vid={video_id} err={exc}"
@@ -223,20 +189,6 @@ def _get_full_entry(video_id):
             )
             if entry:
                 devlog.log_info("FETCH", 200, "/play", "yt_dlp", f"vid={video_id}")
-                devlog.log_detail(
-                    {
-                        "video_id": entry.get("id", ""),
-                        "title": entry.get("title", ""),
-                        "channel": entry.get("uploader", ""),
-                        "duration": entry.get("duration", 0),
-                        "description": (entry.get("description", "") or "")[:120],
-                        "view_count": entry.get("view_count", 0),
-                        "upload_date": entry.get("upload_date", ""),
-                        "formats_available": len(entry.get("formats", [])),
-                    },
-                    source="yt_dlp",
-                    label="entry",
-                )
             return entry
     except Exception as exc:
         logger.warning("Failed to get entry for %s: %s", video_id, exc)
@@ -332,7 +284,6 @@ def download():
     opts = {
         **BASE_OPTS,
         "skip_download": False,
-        "writethumbnail": True,
         "outtmpl": str(save_path / "%(title).50B.%(ext)s"),
     }
     try:
@@ -342,18 +293,6 @@ def download():
             )
             filename = ydl.prepare_filename(info)
             devlog.log_success("FETCH", 200, "/download", "yt_dlp", f"downloaded {vid}")
-            devlog.log_detail(
-                {
-                    "video_id": vid,
-                    "title": info.get("title", ""),
-                    "channel": info.get("uploader", ""),
-                    "duration": info.get("duration", 0),
-                    "saved_to": str(filename),
-                    "filesize": info.get("filesize", 0),
-                },
-                source="yt_dlp",
-                label="download",
-            )
             return jsonify(
                 {
                     "success": True,

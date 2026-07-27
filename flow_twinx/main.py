@@ -23,16 +23,15 @@ SHELL_AUTO_BG = {"radio", "savan"}
 
 
 def kill_port(port):
-    found = False
     for conn in psutil.net_connections(kind="inet"):
         if conn.laddr and conn.laddr.port == port:
-            found = True
             try:
                 proc = psutil.Process(conn.pid)
                 proc.kill()
-            except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-                if not found:
-                    print(f"No process found on port {port}")
+                return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                return False
+    return False
 
 
 def _spinner(stop):
@@ -89,8 +88,16 @@ def main():
     parser.add_argument(
         "command", nargs="?", default=None, help="subcommand (play, search, list, ...)"
     )
+    parser.add_argument(
+        "--check", action="store_true", help="check all dependencies"
+    )
 
     args, unknown = parser.parse_known_args()
+
+    if getattr(args, "check", False):
+        print(f"{P}Dependency Check:{R}\n")
+        config.check_deps()
+        sys.exit(0)
 
     WEB_PID = Path.home() / ".flow/web.pid"
     WEB_PORT = Path.home() / ".flow/web_port"
@@ -104,7 +111,7 @@ def main():
                 port = int(WEB_PORT.read_text().strip()) if WEB_PORT.exists() else 5000
                 kill_port(port)
                 print(f"{P}Stopped web server (PID: {pid}){R}")
-            except ProcessLookupError, ValueError:
+            except (ProcessLookupError, ValueError):
                 print(f"{M}Web server not running{R}")
             WEB_PID.unlink(missing_ok=True)
             WEB_PORT.unlink(missing_ok=True)
@@ -185,6 +192,14 @@ def main():
     elif getattr(args, "rd", None) is not None:
         args.command = "radio"
         unknown = args.rd + unknown
+    elif args.command and args.command not in (
+        "play", "search", "savan", "svn", "savan-s", "svn-s",
+        "like", "download", "switch", "help", "short", "config",
+        "check",
+        "radio", "rd", "playlist", "plist", "exit",
+    ):
+        unknown = [args.command] + unknown
+        args.command = "play"
 
     stop = False
     t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
@@ -248,7 +263,7 @@ def main():
                 if cmd == "switch":
                     commands = _load_commands()
                     show_banner()
-            except EOFError, KeyboardInterrupt:
+            except (EOFError, KeyboardInterrupt):
                 print(f"{M}\nGoodbye!{R}")
                 break
 

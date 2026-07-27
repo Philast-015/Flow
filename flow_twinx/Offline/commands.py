@@ -1,7 +1,7 @@
 import os
 import random
 
-from .. import help_detail, shortcuts
+from .. import help_detail, playlist, shortcuts
 from ..imports import config, is_connected, merge_flags
 from . import file as lib
 from . import player
@@ -48,10 +48,12 @@ COMMANDS = {
     "search": "Search local music library",
     "list": "List local music library",
     "like": "Like the currently playing song",
+    "playlist": "Manage playlists (alias: plist)",
     "switch": "Switch to Online mode (checks connection)",
     "help": "Show this help message",
     "short": "Show/update command shortcuts",
-    "config": "Change primary/secondary/tertiary colors",
+    "config": "Change primary/secondary/tertiary colors, format, display",
+    "check": "Check all dependencies (ffmpeg, vlc, yt-dlp, psutil)",
     "exit": "Exit Flow",
 }
 
@@ -95,7 +97,7 @@ def run(cmd: str, extra: list[str], args):
     cmd = shortcuts.resolve(cmd)
     inf = "-i" in extra
     extra = [x for x in extra if x != "-i"]
-    extra, args = merge_flags(extra, args)
+    extra, args = merge_flags(extra, args) if cmd not in ("config", "check", "short") else (extra, args)
     if cmd == "play":
         play(extra, args)
     elif cmd == "search":
@@ -104,6 +106,8 @@ def run(cmd: str, extra: list[str], args):
         list_library()
     elif cmd == "like":
         like_track()
+    elif cmd in ("playlist", "plist"):
+        playlist_cmd(extra)
     elif cmd == "switch":
         switch_mode()
     elif cmd == "help":
@@ -112,6 +116,8 @@ def run(cmd: str, extra: list[str], args):
         shortcuts.cmd_short(extra, m)
     elif cmd == "config":
         config.cmd_config(extra, args)
+    elif cmd == "check":
+        config.check_deps()
     else:
         e(f"Unknown command: {cmd}")
 
@@ -259,6 +265,102 @@ def like_track():
         m(f"{_last_played.stem} is already liked")
 
 
+def playlist_cmd(extra):
+    if not extra:
+        names = playlist.list_all()
+        if not names:
+            m("No playlists")
+            return
+        i("Playlists:")
+        for name in names:
+            songs = playlist.get(name)
+            m(f"  {name}  ({len(songs)} songs)")
+        return
+
+    subcmd = playlist.resolve_subcmd(extra[0])
+
+    if subcmd == "create":
+        if len(extra) < 2:
+            e("Usage: playlist create <name>")
+            return
+        name = " ".join(extra[1:])
+        if playlist.create(name):
+            i(f"Created playlist: {name}")
+        else:
+            m(f"Playlist '{name}' already exists")
+
+    elif subcmd == "delete":
+        if len(extra) < 2:
+            e("Usage: playlist delete <name>")
+            return
+        name = " ".join(extra[1:])
+        if playlist.delete(name):
+            i(f"Deleted playlist: {name}")
+        else:
+            m(f"Playlist '{name}' not found")
+
+    elif subcmd == "add":
+        if len(extra) < 3:
+            e("Usage: playlist add <name> <index_or_name>")
+            return
+        name = extra[1]
+        target = extra[2]
+        if target.isdigit():
+            idx = int(target) - 1
+            if idx < 0 or idx >= len(_last_results):
+                e("Index out of range")
+                return
+            song_path = _last_results[idx]
+            playlist.add_song(name, song_path.stem, "", str(song_path))
+            i(f"Added: {song_path.stem} to {name}")
+        else:
+            results = lib.find_songs(target)
+            if not results:
+                e(f"No songs found matching '{target}'")
+                return
+            song_path = results[0]
+            playlist.add_song(name, song_path.stem, "", str(song_path))
+            i(f"Added: {song_path.stem} to {name}")
+
+    elif subcmd == "remove":
+        if len(extra) < 3:
+            e("Usage: playlist remove <name> <index_or_name>")
+            return
+        name = extra[1]
+        target = " ".join(extra[2:])
+        if target.isdigit():
+            ok, msg = playlist.remove_song(name, index=int(target) - 1)
+        else:
+            ok, msg = playlist.remove_song(name, title_match=target)
+        if ok:
+            i(f"Removed: {msg} from {name}")
+        else:
+            e(f"     {msg}")
+
+    elif subcmd == "list":
+        if len(extra) < 2:
+            e("Usage: playlist list <name>")
+            return
+        name = extra[1]
+        songs = playlist.get(name)
+        if not songs:
+            m(f"Playlist '{name}' is empty or not found")
+            return
+        i(f"  {name}:")
+        for idx, s in enumerate(songs, 1):
+            m(f"  {idx}. {s['title']}")
+
+    else:
+        name = extra[0]
+        songs = playlist.get(name)
+        if not songs:
+            m(f"Playlist '{name}' is empty or not found")
+            return
+        i(f"  {name}:")
+        for idx, s in enumerate(songs, 1):
+            m(f"  {idx}. {s['title']}")
+
+
 def search(query: str):
     global _last_results
     if not query:
@@ -274,14 +376,16 @@ def search(query: str):
 
 
 def list_library():
+    global _last_results
     songs = lib.get_songs()
     albums = lib.get_albums()
     liked = lib.get_liked_songs()
 
     if songs:
+        _last_results = songs
         i("\nSongs:")
-        for p in songs:
-            m(f"  {p.stem}")
+        for idx, p in enumerate(songs, 1):
+            m(f"  {idx}. {p.stem}")
     if albums:
         i("\nAlbums:")
         for a in albums:

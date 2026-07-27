@@ -34,14 +34,16 @@ ONLINE_HELP = {
         f"{_G}  Use {_M}'play liked'{_G} to play all liked songs.{_R}",
     ],
     "download": [
-        f"{_T}> download{_R} {_M}<query | index>{_R}",
+        f"{_T}> download{_R} {_M}<query | index>{_R} {_M}[-f format]{_R}",
         f"{_G}  Download audio from YouTube without playing.{_R}",
         f"  {_M}<query>{_R}   {_G}Search and download the top result{_R}",
         f"  {_M}<index>{_R}   {_G}Download by index from last search results{_R}",
+        f"  {_M}-f{_R}        {_G}Format: opus, m4a, mp3, webm (default from config){_R}",
         f"{_G}  Downloads are saved to {_M}~/.flow/downloads/{_R}",
         f"  {_G}Examples:{_R}",
         f"    {_G}download never gonna give you up{_R}",
         f"    {_G}download 2{_R}",
+        f"    {_G}download never gonna{_R} {_M}-f mp3{_R}",
     ],
     "savan": [
         f"{_T}> savan{_R} {_M}<query | index>{_R}",
@@ -98,6 +100,18 @@ ONLINE_HELP = {
         f"{_T}> exit{_R}",
         f"{_G}  Exit Flow Music Player.{_R}",
         f"{_G}  Aliases:{_R} {_M}quit{_R}, {_M}q{_R}",
+    ],
+    "config": [
+        f"{_T}> config{_R} {_M}<target> <value>{_R}",
+        f"{_G}  Change settings. Use {_M}config help{_G} to see all targets.{_R}",
+        f"  {_M}format{_R}     {_G}Default download format (opus, m4a, mp3, webm){_R}",
+        f"  {_M}max_search{_R} {_G}Max YouTube search results (1-20, current: {_M}{config.MAX_SEARCH_RESULTS}{_G}){_R}",
+        f"  {_M}max_radio{_R}  {_G}Max radio tracks (1-50, current: {_M}{config.MAX_RESULTS_RADIO}{_G}){_R}",
+    ],
+    "check": [
+        f"{_T}> check{_R}",
+        f"{_G}  Check all dependencies (ffmpeg, vlc, yt-dlp, psutil).{_R}",
+        f"{_G}  Also available as: {_M}flow --check{_R}",
     ],
     "stop": [
         f"{_T}> flow --stop{_R}",
@@ -166,6 +180,18 @@ OFFLINE_HELP = {
         f"{_T}> exit{_R}",
         f"{_G}  Exit Flow Music Player.{_R}",
         f"{_G}  Aliases:{_R} {_B}quit{_R}, {_B}q{_R}",
+    ],
+    "config": [
+        f"{_T}> config{_R} {_B}<target> <value>{_R}",
+        f"{_G}  Change settings. Use {_B}config help{_G} to see all targets.{_R}",
+        f"  {_B}format{_R}     {_G}Default download format (opus, m4a, mp3, webm){_R}",
+        f"  {_B}max_search{_R} {_G}Max YouTube search results (1-20, current: {_B}{config.MAX_SEARCH_RESULTS}{_G}){_R}",
+        f"  {_B}max_radio{_R}  {_G}Max radio tracks (1-50, current: {_B}{config.MAX_RESULTS_RADIO}{_G}){_R}",
+    ],
+    "check": [
+        f"{_T}> check{_R}",
+        f"{_G}  Check all dependencies (ffmpeg, vlc, yt-dlp, psutil).{_R}",
+        f"{_G}  Also available as: {_B}flow --check{_R}",
     ],
     "stop": [
         f"{_T}> flow --stop{_R}",

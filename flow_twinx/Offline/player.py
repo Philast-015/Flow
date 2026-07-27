@@ -1,7 +1,6 @@
 import errno
 import fcntl
 import os
-import re
 import signal
 import sys
 import termios
@@ -13,15 +12,11 @@ import vlc
 from .. import visualizer
 from ..imports import config
 
+_truncate_title = config._truncate_title
+
 P = config.Primary
 S = config.Secondary
 T = config.Tertiary
-
-
-def _truncate_title(title):
-    title = re.sub(r"[^A-Za-z0-9\s]", "", title)
-    words = title.split()
-    return " ".join(words[:4]) + "..." if len(words) > 4 else title
 
 
 M = config.Muted
@@ -150,36 +145,44 @@ def _display_loop(player, duration=0):
 def play_file(filepath, title, args=None):
     global _player, _paused
     _paused = False
-    instance = vlc.Instance("--no-video --quiet")
-    _player = instance.media_player_new()
-    media = instance.media_new(str(filepath))
-    _player.set_media(media)
-    _player.play()
-    _setup_pause_input()
-
-    duration = 0
-    for _ in range(50):
-        duration = _player.get_length() / 1000
-        if duration > 0:
-            break
-        time.sleep(0.1)
-    if duration <= 0:
-        duration = 0
-    dur_min, dur_sec = divmod(int(duration), 60)
-    flags = _flags_str(args)
-    i(f"\nPlaying : {_truncate_title(title)}")
-    m(
-        f"    [{dur_min}:{dur_sec:02d}]  {flags}"
-        if flags
-        else f"    [{dur_min}:{dur_sec:02d}]"
-    )
-
+    devnull = os.open(os.devnull, os.O_RDWR)
+    old_stderr = os.dup(2)
+    os.dup2(devnull, 2)
     try:
-        _display_loop(_player, duration=duration)
-    except KeyboardInterrupt:
-        _player.stop()
-        sys.stdout.write("\n")
-        sys.stdout.flush()
-        raise
+        instance = vlc.Instance("--no-video --quiet")
+        _player = instance.media_player_new()
+        media = instance.media_new(str(filepath))
+        _player.set_media(media)
+        _player.play()
+        _setup_pause_input()
+
+        duration = 0
+        for _ in range(50):
+            duration = _player.get_length() / 1000
+            if duration > 0:
+                break
+            time.sleep(0.1)
+        if duration <= 0:
+            duration = 0
+        dur_min, dur_sec = divmod(int(duration), 60)
+        flags = _flags_str(args)
+        i(f"\nPlaying : {_truncate_title(title)}")
+        m(
+            f"    [{dur_min}:{dur_sec:02d}]  {flags}"
+            if flags
+            else f"    [{dur_min}:{dur_sec:02d}]"
+        )
+
+        try:
+            _display_loop(_player, duration=duration)
+        except KeyboardInterrupt:
+            _player.stop()
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            raise
+        finally:
+            _restore_pause_input()
     finally:
-        _restore_pause_input()
+        os.dup2(old_stderr, 2)
+        os.close(old_stderr)
+        os.close(devnull)

@@ -1,8 +1,19 @@
 import pathlib
 import shutil
-from ..imports import config
 
-AUDIO_EXTENSIONS = {".mp3", ".flac", ".wav", ".m4a", ".ogg", ".opus", ".wma", ".aac",".webm"}
+from flow_twinx import config
+
+AUDIO_EXTENSIONS = {
+    ".mp3",
+    ".flac",
+    ".wav",
+    ".m4a",
+    ".ogg",
+    ".opus",
+    ".wma",
+    ".aac",
+    ".webm",
+}
 LIKED_DIR_NAME = "liked songs"
 
 
@@ -13,10 +24,13 @@ def _liked_dir() -> pathlib.Path:
 def get_all_songs() -> list[pathlib.Path]:
     if not config.DOWNLOAD_DIR.exists():
         return []
-    return sorted([
-        p for p in config.DOWNLOAD_DIR.rglob("*")
-        if p.suffix.lower() in AUDIO_EXTENSIONS
-    ])
+    return sorted(
+        [
+            p
+            for p in config.DOWNLOAD_DIR.rglob("*")
+            if p.suffix.lower() in AUDIO_EXTENSIONS
+        ]
+    )
 
 
 def get_songs() -> list[pathlib.Path]:
@@ -28,30 +42,25 @@ def get_albums() -> list[str]:
     if not config.DOWNLOAD_DIR.exists():
         return []
     liked = _liked_dir()
-    return sorted([
-        d.name for d in config.DOWNLOAD_DIR.iterdir()
-        if d.is_dir() and d != liked
-    ])
+    return sorted(
+        [d.name for d in config.DOWNLOAD_DIR.iterdir() if d.is_dir() and d != liked]
+    )
 
 
 def get_album_songs(album: str) -> list[pathlib.Path]:
     album_dir = config.DOWNLOAD_DIR / album
     if not album_dir.exists() or not album_dir.is_dir():
         return []
-    return sorted([
-        p for p in album_dir.iterdir()
-        if p.suffix.lower() in AUDIO_EXTENSIONS
-    ])
+    return sorted(
+        [p for p in album_dir.iterdir() if p.suffix.lower() in AUDIO_EXTENSIONS]
+    )
 
 
 def get_liked_songs() -> list[pathlib.Path]:
     liked = _liked_dir()
     if not liked.exists():
         return []
-    return sorted([
-        p for p in liked.iterdir()
-        if p.suffix.lower() in AUDIO_EXTENSIONS
-    ])
+    return sorted([p for p in liked.iterdir() if p.suffix.lower() in AUDIO_EXTENSIONS])
 
 
 def like_song(song_path: pathlib.Path) -> pathlib.Path | None:

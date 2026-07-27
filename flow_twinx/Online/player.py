@@ -1,7 +1,6 @@
 import errno
 import fcntl
 import os
-import re
 import signal
 import sys
 import termios
@@ -13,18 +12,14 @@ import vlc
 from .. import lyrics, visualizer
 from ..imports import config
 
+_truncate_title = config._truncate_title
+
 P = config.Primary
 S = config.Secondary
 T = config.Tertiary
 M = config.Muted
 E = config.Red
 R = config.Reset
-
-
-def _truncate_title(title):
-    title = re.sub(r"[^A-Za-z0-9\s]", "", title)
-    words = title.split()
-    return " ".join(words[:4]) + "..." if len(words) > 4 else title
 
 
 m = lambda t: print(f"{M}{t}{R}")
@@ -173,40 +168,48 @@ def _display_loop(player, title, video_id=None, duration=0, stop_check=None):
 def play_url(url, title, args=None, duration=0):
     global _player, _paused
     _paused = False
-    instance = vlc.Instance("--no-video --quiet")
-    _player = instance.media_player_new()
-    media = instance.media_new(url)
-    _player.set_media(media)
-    _player.play()
-    _setup_pause_input()
-
-    config.dev_print(
-        "Player (Savan URL)",
-        {
-            "title": title,
-            "stream_url": url[:80] + "..." if len(url) > 80 else url,
-            "duration": f"{duration}s",
-        },
-    )
-
-    dur_min, dur_sec = divmod(int(duration), 60)
-    flags = _flags_str(args)
-    i(f"\n[⥤ Now : {_truncate_title(title)}]")
-    m(
-        f"    [{dur_min}:{dur_sec:02d}]  {flags}"
-        if flags
-        else f"    [{dur_min}:{dur_sec:02d}]"
-    )
-
+    devnull = os.open(os.devnull, os.O_RDWR)
+    old_stderr = os.dup(2)
+    os.dup2(devnull, 2)
     try:
-        _display_loop(_player, title, duration=duration)
-    except KeyboardInterrupt:
-        _player.stop()
-        sys.stdout.write("\n")
-        sys.stdout.flush()
-        raise
+        instance = vlc.Instance("--no-video --quiet")
+        _player = instance.media_player_new()
+        media = instance.media_new(url)
+        _player.set_media(media)
+        _player.play()
+        _setup_pause_input()
+
+        config.dev_print(
+            "Player (Savan URL)",
+            {
+                "title": title,
+                "stream_url": url[:80] + "..." if len(url) > 80 else url,
+                "duration": f"{duration}s",
+            },
+        )
+
+        dur_min, dur_sec = divmod(int(duration), 60)
+        flags = _flags_str(args)
+        i(f"\n[⥤ Now : {_truncate_title(title)}]")
+        m(
+            f"    [{dur_min}:{dur_sec:02d}]  {flags}"
+            if flags
+            else f"    [{dur_min}:{dur_sec:02d}]"
+        )
+
+        try:
+            _display_loop(_player, title, duration=duration)
+        except KeyboardInterrupt:
+            _player.stop()
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            raise
+        finally:
+            _restore_pause_input()
     finally:
-        _restore_pause_input()
+        os.dup2(old_stderr, 2)
+        os.close(old_stderr)
+        os.close(devnull)
 
 
 def play_entry(entry, title, args=None, flags=None):
@@ -219,9 +222,16 @@ def play_entry(entry, title, args=None, flags=None):
 
     stream_url = None
     for fmt in reversed(entry.get("formats", [])):
-        if fmt.get("acodec") != "none":
-            stream_url = fmt["url"]
+        if fmt.get("acodec") != "none" and fmt.get("vcodec") == "none":
+            stream_url = fmt.get("url")
             break
+    if not stream_url:
+        for fmt in reversed(entry.get("formats", [])):
+            if fmt.get("acodec") != "none":
+                stream_url = fmt.get("url")
+                break
+    if not stream_url:
+        stream_url = entry.get("url")
     if not stream_url:
         e("     No playable stream found")
         return

@@ -16,6 +16,7 @@ DEFAULT_SHORTCUTS = {
     "ex": "exit",
     "svn": "savan",
     "svn-s": "savan-s",
+    "plist": "playlist",
 }
 
 _shortcuts = {}
