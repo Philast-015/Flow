@@ -11,8 +11,17 @@ if __name__ == "__main__" and __package__ is None:
     __package__ = "flow_twinx"
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from . import shortcuts
+from flow_twinx import shortcuts
+from flow_twinx.Offline import commands as _offline_commands
+from flow_twinx.Online import commands as _online_commands
+
 from .imports import config, is_connected, show_banner, tui_input
+
+_COMMAND_MODULES = {
+    "Online": _online_commands,
+    "Offline": _offline_commands,
+}
+
 
 P = config.Primary
 S = config.Secondary
@@ -29,7 +38,7 @@ def kill_port(port):
                 proc = psutil.Process(conn.pid)
                 proc.kill()
                 return True
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
+            except psutil.NoSuchProcess, psutil.AccessDenied:
                 return False
     return False
 
@@ -47,7 +56,7 @@ def _spinner(stop):
 
 
 def _load_commands():
-    return importlib.import_module(f".{config.Mode}.commands", package=__package__)
+    return _COMMAND_MODULES[config.Mode]
 
 
 def _check_vlc():
@@ -88,9 +97,7 @@ def main():
     parser.add_argument(
         "command", nargs="?", default=None, help="subcommand (play, search, list, ...)"
     )
-    parser.add_argument(
-        "--check", action="store_true", help="check all dependencies"
-    )
+    parser.add_argument("--check", action="store_true", help="check all dependencies")
 
     args, unknown = parser.parse_known_args()
 
@@ -111,7 +118,7 @@ def main():
                 port = int(WEB_PORT.read_text().strip()) if WEB_PORT.exists() else 5000
                 kill_port(port)
                 print(f"{P}Stopped web server (PID: {pid}){R}")
-            except (ProcessLookupError, ValueError):
+            except ProcessLookupError, ValueError:
                 print(f"{M}Web server not running{R}")
             WEB_PID.unlink(missing_ok=True)
             WEB_PORT.unlink(missing_ok=True)
@@ -193,10 +200,24 @@ def main():
         args.command = "radio"
         unknown = args.rd + unknown
     elif args.command and args.command not in (
-        "play", "search", "savan", "svn", "savan-s", "svn-s",
-        "like", "download", "switch", "help", "short", "config",
+        "play",
+        "search",
+        "savan",
+        "svn",
+        "savan-s",
+        "svn-s",
+        "like",
+        "download",
+        "switch",
+        "help",
+        "short",
+        "config",
         "check",
-        "radio", "rd", "playlist", "plist", "exit",
+        "radio",
+        "rd",
+        "playlist",
+        "plist",
+        "exit",
     ):
         unknown = [args.command] + unknown
         args.command = "play"
@@ -263,7 +284,7 @@ def main():
                 if cmd == "switch":
                     commands = _load_commands()
                     show_banner()
-            except (EOFError, KeyboardInterrupt):
+            except EOFError, KeyboardInterrupt:
                 print(f"{M}\nGoodbye!{R}")
                 break
 

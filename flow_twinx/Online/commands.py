@@ -154,7 +154,6 @@ def play(extra: list[str], args):
 
     if getattr(args, "download", False):
         download(extra)
-        return
 
     if arg == "liked":
         _play_liked(args)
@@ -174,7 +173,19 @@ def play(extra: list[str], args):
         if getattr(args, "bg", False):
             if not _fork_bg("Now playing"):
                 return
-        player.play_entry(entry, title, args)
+        if repeat:
+            repeat_count = getattr(args, "repeat_count", 0)
+            iteration = 0
+            try:
+                while True:
+                    player.play_entry(entry, title, args)
+                    iteration += 1
+                    if repeat_count > 0 and iteration >= repeat_count:
+                        break
+            except KeyboardInterrupt:
+                pass
+        else:
+            player.play_entry(entry, title, args)
         return
 
     _do_search(arg)
@@ -294,7 +305,19 @@ def savan_cmd(extra, args):
         if getattr(args, "bg", False):
             if not _fork_bg("Now playing"):
                 return
-        player.play_url(url, title, args, dur)
+        if repeat:
+            repeat_count = getattr(args, "repeat_count", 0)
+            iteration = 0
+            try:
+                while True:
+                    player.play_url(url, title, args, dur)
+                    iteration += 1
+                    if repeat_count > 0 and iteration >= repeat_count:
+                        break
+            except KeyboardInterrupt:
+                pass
+        else:
+            player.play_url(url, title, args, dur)
         return
 
     stop = False

@@ -97,7 +97,11 @@ def run(cmd: str, extra: list[str], args):
     cmd = shortcuts.resolve(cmd)
     inf = "-i" in extra
     extra = [x for x in extra if x != "-i"]
-    extra, args = merge_flags(extra, args) if cmd not in ("config", "check", "short") else (extra, args)
+    extra, args = (
+        merge_flags(extra, args)
+        if cmd not in ("config", "check", "short")
+        else (extra, args)
+    )
     if cmd == "play":
         play(extra, args)
     elif cmd == "search":
@@ -163,7 +167,20 @@ def play(extra: list[str], args):
     if getattr(args, "bg", False):
         if not _fork_bg("Now playing"):
             return
-    player.play_file(song_path, song_path.stem, args)
+    repeat = getattr(args, "repeat", False)
+    repeat_count = getattr(args, "repeat_count", 0)
+    iteration = 0
+    if repeat:
+        try:
+            while True:
+                player.play_file(song_path, song_path.stem, args)
+                iteration += 1
+                if repeat_count > 0 and iteration >= repeat_count:
+                    break
+        except KeyboardInterrupt:
+            pass
+    else:
+        player.play_file(song_path, song_path.stem, args)
 
 
 def _play_liked(args):
