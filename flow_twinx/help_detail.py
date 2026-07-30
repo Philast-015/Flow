@@ -29,8 +29,8 @@ ONLINE_HELP = {
     ],
     "like": [
         f"{_T}> like{_R}",
-        f"{_G}  Like the currently playing song.{_R}",
-        f"{_G}  Liked songs are saved to {_M}~/.flow/liked.txt{_R}",
+        f"{_G}  Like/unlike the currently playing song.{_R}",
+        f"{_G}  Liked songs are saved to {_M}~/.flow/liked.json{_R}",
         f"{_G}  Use {_M}'play liked'{_G} to play all liked songs.{_R}",
     ],
     "download": [
@@ -113,6 +113,22 @@ ONLINE_HELP = {
         f"{_G}  Check all dependencies (ffmpeg, vlc, yt-dlp, psutil).{_R}",
         f"{_G}  Also available as: {_M}flow --check{_R}",
     ],
+    "playlist": [
+        f"{_T}> playlist{_R} {_M}<subcommand> [args]{_R}",
+        f"{_G}  Manage playlists. Subcommands:{_R}",
+        f"  {_M}create{_R} {_G}<name>{_R}          {_G}Create a new playlist{_R}",
+        f"  {_M}delete{_R} {_G}<name>{_R}          {_G}Delete a playlist{_R}",
+        f"  {_M}add{_R}    {_G}<name> <index>{_R}  {_G}Add a song by search index{_R}",
+        f"  {_M}remove{_R} {_G}<name> <index>{_R}  {_G}Remove a song by index{_R}",
+        f"  {_M}list{_R}   {_G}<name>{_R}          {_G}List songs in a playlist{_R}",
+        f"  {_M}play{_R}   {_G}<name>{_R}          {_G}Play all songs in a playlist{_R}",
+        f"  {_M}Flags:{_R} {_G}{_M}-bg{_R} {_G}background |{_R} {_M}-r{_R} {_G}repeat |{_R} {_M}-s{_R} {_G}shuffle{_R}",
+        f"  {_G}Alias:{_R} {_M}plist{_R}",
+    ],
+    "export": [
+        f"{_T}> export{_R}",
+        f"{_G}  Backup ~/.flow config and data to ~/Downloads/flow_backup.zip{_R}",
+    ],
     "stop": [
         f"{_T}> flow --stop{_R}",
         f"{_G}  Stop all background VLC processes.{_R}",
@@ -151,9 +167,21 @@ OFFLINE_HELP = {
     ],
     "like": [
         f"{_T}> like{_R}",
-        f"{_G}  Like the currently playing song from offline mode.{_R}",
-        f"{_G}  Liked songs are copied to {_B}~/.flow/music/Liked/{_R}",
+        f"{_G}  Like/unlike the currently playing song from offline mode.{_R}",
+        f"{_G}  Liked songs are copied to {_B}~/.flow/downloads/liked songs/{_R}",
         f"{_G}  Use {_B}'play liked'{_G} to play all liked songs.{_R}",
+    ],
+    "playlist": [
+        f"{_T}> playlist{_R} {_B}<subcommand> [args]{_R}",
+        f"{_G}  Manage playlists. Subcommands:{_R}",
+        f"  {_B}create{_R} {_G}<name>{_R}          {_G}Create a new playlist{_R}",
+        f"  {_B}delete{_R} {_G}<name>{_R}          {_G}Delete a playlist{_R}",
+        f"  {_B}add{_R}    {_G}<name> <index>{_R}  {_G}Add a song by index from last search{_R}",
+        f"  {_B}remove{_R} {_G}<name> <index>{_R}  {_G}Remove a song by index{_R}",
+        f"  {_B}list{_R}   {_G}<name>{_R}          {_G}List songs in a playlist{_R}",
+        f"  {_B}play{_R}   {_G}<name>{_R}          {_G}Play all songs in a playlist{_R}",
+        f"  {_B}Flags:{_R} {_G}{_B}-bg{_R} {_G}background |{_R} {_B}-r{_R} {_G}repeat |{_B}-s{_R} {_G}shuffle{_R}",
+        f"  {_G}Alias:{_R} {_B}plist{_R}",
     ],
     "switch": [
         f"{_T}> switch{_R}",
@@ -192,6 +220,10 @@ OFFLINE_HELP = {
         f"{_T}> check{_R}",
         f"{_G}  Check all dependencies (ffmpeg, vlc, yt-dlp, psutil).{_R}",
         f"{_G}  Also available as: {_B}flow --check{_R}",
+    ],
+    "export": [
+        f"{_T}> export{_R}",
+        f"{_G}  Backup ~/.flow config and data to ~/Downloads/flow_backup.zip{_R}",
     ],
     "stop": [
         f"{_T}> flow --stop{_R}",

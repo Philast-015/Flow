@@ -73,6 +73,15 @@ def like_song(song_path: pathlib.Path) -> pathlib.Path | None:
     return dest
 
 
+def unlike_song(song_path: pathlib.Path) -> bool:
+    liked = _liked_dir()
+    dest = liked / song_path.name
+    if dest.exists():
+        dest.unlink()
+        return True
+    return False
+
+
 def find_songs(query: str) -> list[pathlib.Path]:
     q = query.lower()
     return [s for s in get_songs() if q in s.stem.lower()]

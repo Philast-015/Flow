@@ -9,7 +9,8 @@ A terminal-based music player with online streaming and offline library modes.
 - **Offline mode** — Play local audio files with album support, search, and a liked-songs collection
 - **Download** — Save tracks from YouTube to your local library with the `-d` flag
 - **Repeat & shuffle** — Loop tracks n times or play in random order
-- **Like/unlike** — Save favorites to a dedicated playlist
+- **Like/unlike** — Toggle favorites on/off, stored in `~/.flow/liked.json`
+- **Playlist play** — Create playlists and play them with `playlist play <name>`
 - **Tab completion** — Auto-complete commands and song names in offline mode
 - **Colored TUI** — Cyan theme for online, magenta for offline, with borders and banners
 - **Background play** — Play music in background and return to your shell
@@ -105,9 +106,11 @@ flow --web
 | `play <name or #>`     | Play a song by name or search result number       |
 | `search <query>`       | Search YouTube (online) or library (offline)      |
 | `list`                 | Show all songs, albums, or liked tracks           |
-| `like <name or #>`     | Add a song to your liked collection               |
+| `like`                 | Like/unlike the currently playing song            |
 | `download <name or #>` | Save a streamed song to the local library         |
 | `radio <name> [#]`     | Generate a radio mix, or play specific track      |
+| `playlist <sub>`       | Manage playlists (create/add/remove/play)        |
+| `export`               | Backup ~/.flow config to ~/Downloads              |
 | `switch`               | Toggle between online and offline mode            |
 | `help`                 | Show available commands                           |
 | `help -i`              | Show available commands with detailed explanation |
@@ -129,7 +132,7 @@ Usage: `config <target> <value>`
 ## Configuration
 
 - Downloads and library are stored in `~/.flow/downloads/`
-- Liked songs (online) are saved to `~/.flow/liked.txt`
+- Liked songs (online) are saved to `~/.flow/liked.json`
 - Liked songs (offline) are copied to `~/.flow/downloads/liked songs/`
 - User shortcuts are stored in `~/.flow/shortcuts.json`
 - Config file: `~/.flow/config.json`

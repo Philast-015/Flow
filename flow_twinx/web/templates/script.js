@@ -46,6 +46,7 @@ const autoPlayToggle = document.getElementById("autoPlayToggle");
 const downloadBtn = document.getElementById("downloadBtn");
 const toastEl = document.getElementById("toast");
 const setDownloadPath = document.getElementById("setDownloadPath");
+const refreshLikedBtn = document.getElementById("refreshLikedBtn");
 const likeBtn = document.getElementById("likeBtn");
 
 let queue = [];
@@ -69,6 +70,7 @@ let settings = {
   crossfade: 2,
   miniOnBlur: false,
   defaultSource: "youtube",
+  format: "webm",
 };
 
 function debounce(fn, ms) {
@@ -146,6 +148,7 @@ progressBar.addEventListener("click", (e) => {
 clearQueueBtn.addEventListener("click", clearQueue);
 document.getElementById("saveQueueBtn").addEventListener("click", saveQueue);
 scanLocalBtn.addEventListener("click", scanLocal);
+refreshLikedBtn.addEventListener("click", loadLiked);
 
 miniExpandBtn.addEventListener("click", () => {
   miniPlayer.style.display = "none";
@@ -892,6 +895,8 @@ function updateSettingsUI() {
     settings.defaultSource || "youtube";
   document.getElementById("setDownloadPath").value =
     settings.downloadPath || "~/.flow/downloads";
+  document.getElementById("setDownloadFormat").value =
+    settings.format || "webm";
 }
 
 function saveSettingsToAPI() {
@@ -905,6 +910,7 @@ function saveSettingsToAPI() {
     miniOnBlur: document.getElementById("setMiniOnBlur").checked,
     defaultSource: document.getElementById("setDefaultSource").value,
     downloadPath: document.getElementById("setDownloadPath").value || "~/.flow/downloads",
+    format: document.getElementById("setDownloadFormat").value || "webm",
   };
   fetch("/api/settings", {
     method: "POST",
@@ -930,6 +936,7 @@ function resetSettings() {
     miniOnBlur: false,
     defaultSource: "youtube",
     downloadPath: "~/.flow/downloads",
+    format: "webm",
   };
   applySettings();
   updateSettingsUI();
@@ -971,7 +978,7 @@ function downloadTrack() {
   fetch("/download", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ video_id: vid, save_dir: saveDir }),
+    body: JSON.stringify({ video_id: vid, save_dir: saveDir, format: settings.format }),
   })
     .then(function (r) { return r.json(); })
     .then(function (data) {

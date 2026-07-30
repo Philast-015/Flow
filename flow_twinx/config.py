@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -89,6 +90,18 @@ FORMAT = "webm"
 _VALID_FORMATS = {"opus", "m4a", "mp3", "webm"}
 
 
+def set_format(fmt):
+    global FORMAT
+    fmt = fmt.lower()
+    if fmt not in _VALID_FORMATS:
+        return False
+    if fmt != "webm" and not FFMPEG:
+        return False
+    FORMAT = fmt
+    _save_config()
+    return True
+
+
 def dev_print(label: str, data: dict | list | str | None = None):
     if not DEV_MODE:
         return
@@ -167,6 +180,30 @@ def check_deps():
         status = "installed" if ok else "not installed"
         test = "passed" if ok else "failed"
         print(f"  | {name:10s} | {status:13s} | {test:6s} |")
+
+
+def export_flow():
+    import zipfile
+
+    flow_dir = pathlib.Path.home() / ".flow"
+    dest = pathlib.Path.home() / "Downloads" / "flow_backup.zip"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    skip_dirs = {"downloads", "playlist", "LOGS"}
+    skip_files = {"vlc.pid"}
+    included = 0
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(flow_dir):
+            rel_root = pathlib.Path(root).relative_to(flow_dir)
+            dirs[:] = [d for d in dirs if d not in skip_dirs]
+            for fname in files:
+                if fname in skip_files:
+                    continue
+                fpath = pathlib.Path(root) / fname
+                arcname = rel_root / fname
+                zf.write(fpath, arcname)
+                included += 1
+    size_kb = dest.stat().st_size // 1024
+    print(f"Exported {included} files to {dest} ({size_kb} KB)")
 
 
 FILLER_WORDS = {
@@ -302,7 +339,7 @@ except PackageNotFoundError:
 
 Mode = "Online"
 
-liked_music = pathlib.Path.home() / ".flow/liked.txt"
+liked_music = pathlib.Path.home() / ".flow/liked.json"
 
 MAX_RESULTS_RADIO = 35
 MAX_SEARCH_RESULTS = 5

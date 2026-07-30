@@ -31,6 +31,8 @@ t = lambda t: print(f"{T}{t}{R}")
 _paused = False
 _player = None
 _original_term = None
+_stop_reader = threading.Event()
+_reader_thread = None
 
 
 def _sigusr1_toggle(sig, frame):
@@ -56,14 +58,16 @@ def _setup_pause_input():
     fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
     signal.signal(signal.SIGUSR1, _sigusr1_toggle)
     signal.signal(signal.SIGTSTP, signal.SIG_IGN)
-    thread = threading.Thread(target=_input_reader, daemon=True)
-    thread.start()
+    global _reader_thread, _stop_reader
+    _stop_reader.clear()
+    _reader_thread = threading.Thread(target=_input_reader, daemon=True)
+    _reader_thread.start()
 
 
 def _input_reader():
     fd = sys.stdin.fileno()
     try:
-        while True:
+        while not _stop_reader.is_set():
             try:
                 ch = os.read(fd, 1)
             except OSError as ex:
@@ -78,7 +82,11 @@ def _input_reader():
 
 
 def _restore_pause_input():
-    global _original_term
+    global _original_term, _reader_thread
+    _stop_reader.set()
+    if _reader_thread and _reader_thread.is_alive():
+        _reader_thread.join(timeout=0.2)
+    _reader_thread = None
     if _original_term is not None:
         try:
             fd = sys.stdin.fileno()

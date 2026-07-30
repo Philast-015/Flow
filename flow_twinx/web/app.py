@@ -61,6 +61,8 @@ SETTINGS_FILE = pathlib.Path.home() / ".flow/web_ui.json"
 FLOW_DIR = pathlib.Path.home() / ".flow/downloads"
 MUSIC_DIR = pathlib.Path.home() / ".flow/music"
 
+_truncate_title = config._truncate_title
+
 AUDIO_EXTENSIONS = {
     ".mp3",
     ".flac",
@@ -116,7 +118,7 @@ def _get_thumbnail(entry):
 
 def _entry_to_dict(entry):
     return {
-        "title": entry.get("title", "Unknown"),
+        "title": _truncate_title(entry.get("title", "Unknown")),
         "video_id": entry.get("id", ""),
         "stream_url": _get_stream_url(entry) or "",
         "thumbnail": _get_thumbnail(entry),
@@ -158,7 +160,7 @@ def _fetch_radio(video_id, max_results=30):
             entries = info.get("entries", []) if info else []
             tracks = [
                 {
-                    "title": e.get("title", "Unknown"),
+                    "title": _truncate_title(e.get("title", "Unknown")),
                     "video_id": e["id"],
                     "duration": e.get("duration", 0),
                     "thumbnail": _get_thumbnail(e),
@@ -277,8 +279,13 @@ def download():
     data = request.get_json(force=True)
     vid = data.get("video_id", "").strip()
     save_dir = data.get("save_dir", str(FLOW_DIR))
+    fmt = data.get("format", config.FORMAT)
     if not vid:
         return jsonify({"error": "missing video_id"}), 400
+    if fmt not in ("webm", "opus", "m4a", "mp3"):
+        return jsonify({"error": f"unsupported format '{fmt}'"}), 400
+    if fmt != "webm" and not config.FFMPEG:
+        return jsonify({"error": f"ffmpeg not found, cannot convert to {fmt}"}), 400
     save_path = pathlib.Path(save_dir).expanduser()
     save_path.mkdir(parents=True, exist_ok=True)
     opts = {
@@ -286,18 +293,24 @@ def download():
         "skip_download": False,
         "outtmpl": str(save_path / "%(title).50B.%(ext)s"),
     }
+    if fmt != "webm":
+        opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": fmt}]
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(
                 f"https://www.youtube.com/watch?v={vid}", download=True
             )
             filename = ydl.prepare_filename(info)
+            if fmt != "webm":
+                ext = fmt
+                stem = pathlib.Path(filename).stem
+                filename = str(pathlib.Path(save_path) / f"{stem}.{ext}")
             devlog.log_success("FETCH", 200, "/download", "yt_dlp", f"downloaded {vid}")
             return jsonify(
                 {
                     "success": True,
                     "path": str(filename),
-                    "title": info.get("title", "Unknown"),
+                    "title": _truncate_title(info.get("title", "Unknown")),
                 }
             )
     except Exception as exc:
@@ -390,21 +403,14 @@ def api_liked():
     liked_ids = set()
     liked_entries = []
     try:
-        for line in liked_file.read_text().splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            if "|" in line:
-                title, url = line.split("|", 1)
-                title = title.strip()
-                url = url.strip()
-                if "v=" in url:
-                    vid = url.split("v=", 1)[1].split("&")[0]
-                    liked_ids.add(vid)
-                    liked_entries.append({"video_id": vid, "title": title})
-            else:
-                liked_ids.add(line)
-                liked_entries.append({"video_id": line, "title": line})
+        songs = json.loads(liked_file.read_text())
+        for s in songs:
+            url = s.get("url", "")
+            title = s.get("title", "")
+            if "v=" in url:
+                vid = url.split("v=", 1)[1].split("&")[0]
+                liked_ids.add(vid)
+                liked_entries.append({"video_id": vid, "title": title})
     except Exception:
         pass
     huge_liked = pathlib.Path.home() / ".flow/downloads/liked songs"
@@ -434,36 +440,19 @@ def api_like():
     liked_file = config.liked_music
     liked_file.parent.mkdir(parents=True, exist_ok=True)
     url = f"https://www.youtube.com/watch?v={video_id}"
-    new_line = f"{title}|{url}"
-    existing = set()
+    songs = []
     if liked_file.exists():
         try:
-            for line in liked_file.read_text().splitlines():
-                if "|" in line:
-                    _, lurl = line.split("|", 1)
-                    if f"v={video_id}" in lurl:
-                        existing.add(video_id)
-                elif line.strip() == video_id:
-                    existing.add(video_id)
+            songs = json.loads(liked_file.read_text())
         except Exception:
-            pass
-    if video_id in existing:
-        try:
-            lines = liked_file.read_text().splitlines()
-            kept = []
-            for line in lines:
-                if "|" in line:
-                    _, lurl = line.split("|", 1)
-                    if f"v={video_id}" not in lurl:
-                        kept.append(line)
-                elif line.strip() != video_id:
-                    kept.append(line)
-            liked_file.write_text("\n".join(kept) + "\n" if kept else "")
-        except Exception:
-            pass
+            songs = []
+    match = next((s for s in songs if s.get("url", "").endswith(f"v={video_id}")), None)
+    if match:
+        songs.remove(match)
+        liked_file.write_text(json.dumps(songs, indent=2))
         return jsonify({"liked": False, "video_id": video_id})
-    with open(liked_file, "a") as f:
-        f.write(f"{new_line}\n")
+    songs.append({"title": title, "url": url})
+    liked_file.write_text(json.dumps(songs, indent=2))
     return jsonify({"liked": True, "video_id": video_id})
 
 
@@ -476,8 +465,9 @@ def api_is_liked():
     if not liked_file.exists():
         return jsonify({"liked": False})
     try:
-        for line in liked_file.read_text().splitlines():
-            if f"v={video_id}" in line or line.strip() == video_id:
+        songs = json.loads(liked_file.read_text())
+        for s in songs:
+            if video_id in s.get("url", ""):
                 return jsonify({"liked": True})
     except Exception:
         pass
@@ -495,15 +485,20 @@ def api_settings():
                 existing = json.loads(SETTINGS_FILE.read_text())
             except Exception:
                 pass
+        if "format" in data:
+            if not config.set_format(data["format"]):
+                return jsonify({"error": f"invalid format '{data['format']}'"}), 400
         existing.update(data)
         SETTINGS_FILE.write_text(json.dumps(existing, indent=2))
         return jsonify({"saved": True, "settings": existing})
+    result = {}
     if SETTINGS_FILE.exists():
         try:
-            return jsonify(json.loads(SETTINGS_FILE.read_text()))
+            result = json.loads(SETTINGS_FILE.read_text())
         except Exception:
             pass
-    return jsonify({})
+    result["format"] = config.FORMAT
+    return jsonify(result)
 
 
 @app.route("/")

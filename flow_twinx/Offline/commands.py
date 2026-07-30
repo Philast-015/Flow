@@ -1,4 +1,5 @@
 import os
+import pathlib
 import random
 
 from .. import help_detail, playlist, shortcuts
@@ -54,6 +55,7 @@ COMMANDS = {
     "short": "Show/update command shortcuts",
     "config": "Change primary/secondary/tertiary colors, format, display",
     "check": "Check all dependencies (ffmpeg, vlc, yt-dlp, psutil)",
+    "export": "Backup ~/.flow config to ~/Downloads",
     "exit": "Exit Flow",
 }
 
@@ -111,7 +113,7 @@ def run(cmd: str, extra: list[str], args):
     elif cmd == "like":
         like_track()
     elif cmd in ("playlist", "plist"):
-        playlist_cmd(extra)
+        playlist_cmd(extra, args)
     elif cmd == "switch":
         switch_mode()
     elif cmd == "help":
@@ -122,6 +124,8 @@ def run(cmd: str, extra: list[str], args):
         config.cmd_config(extra, args)
     elif cmd == "check":
         config.check_deps()
+    elif cmd == "export":
+        config.export_flow()
     else:
         e(f"Unknown command: {cmd}")
 
@@ -275,14 +279,20 @@ def like_track():
     if not _last_played:
         e("No song currently playing")
         return
-    dest = lib.like_song(_last_played)
-    if dest:
-        i(f"Liked: {_last_played.stem}")
+    song_path = _last_played
+    liked = lib.get_liked_songs()
+    if song_path in liked:
+        lib.unlike_song(song_path)
+        i(f"Unliked: {song_path.stem}")
     else:
-        m(f"{_last_played.stem} is already liked")
+        dest = lib.like_song(song_path)
+        if dest:
+            i(f"Liked: {song_path.stem}")
+        else:
+            m(f"{song_path.stem} is already liked")
 
 
-def playlist_cmd(extra):
+def playlist_cmd(extra, args=None):
     if not extra:
         names = playlist.list_all()
         if not names:
@@ -366,6 +376,41 @@ def playlist_cmd(extra):
         i(f"  {name}:")
         for idx, s in enumerate(songs, 1):
             m(f"  {idx}. {s['title']}")
+
+    elif subcmd == "play":
+        if len(extra) < 2:
+            e("Usage: playlist play <name>")
+            return
+        name = extra[1]
+        songs = playlist.get(name)
+        if not songs:
+            m(f"Playlist '{name}' is empty or not found")
+            return
+        tracks = list(songs)
+        if getattr(args, "shuffle", False):
+            random.shuffle(tracks)
+        repeat = getattr(args, "repeat", False)
+        repeat_count = getattr(args, "repeat_count", 0)
+        iteration = 0
+        if getattr(args, "bg", False):
+            if not _fork_bg(f"Playing playlist: {name}"):
+                return
+        try:
+            while True:
+                for s in tracks:
+                    fpath = pathlib.Path(s.get("url", ""))
+                    if not fpath.exists():
+                        m(f"    Skipping {s.get('title', 'Unknown')} (file not found)")
+                        continue
+                    _last_played = fpath
+                    player.play_file(fpath, s.get("title", "Unknown"), args)
+                if not repeat:
+                    break
+                iteration += 1
+                if repeat_count > 0 and iteration >= repeat_count:
+                    break
+        except KeyboardInterrupt:
+            pass
 
     else:
         name = extra[0]

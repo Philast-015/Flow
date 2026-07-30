@@ -1,5 +1,6 @@
 import errno
 import fcntl
+import json
 import os
 import random
 import signal
@@ -71,6 +72,7 @@ COMMANDS = {
     "short": "Show/update command shortcuts",
     "config": "Change primary/secondary/tertiary colors, format, display",
     "check": "Check all dependencies (ffmpeg, vlc, yt-dlp, psutil)",
+    "export": "Backup ~/.flow config to ~/Downloads",
     "exit": "Exit Flow",
 }
 
@@ -117,6 +119,8 @@ def run(cmd: str, extra: list[str], args):
         config.cmd_config(extra, args)
     elif cmd == "check":
         config.check_deps()
+    elif cmd == "export":
+        config.export_flow()
     else:
         print(f"Unknown command: {cmd}")
 
@@ -241,24 +245,25 @@ def _play_liked(args):
     if not config.liked_music.exists():
         e("     No liked songs yet")
         return
-    liked = config.liked_music.read_text().strip().splitlines()
-    if not liked:
+    try:
+        songs = json.loads(config.liked_music.read_text())
+    except (json.JSONDecodeError, OSError):
+        songs = []
+    if not songs:
         e("     No liked songs yet")
         return
-    songs = []
-    for line in liked:
-        if "|" not in line:
-            continue
-        title, url = line.split("|", 1)
-        songs.append((title, url))
+    tracks = [(s["title"], s["url"]) for s in songs if "title" in s and "url" in s]
+    if not tracks:
+        e("     No liked songs yet")
+        return
     if getattr(args, "shuffle", False):
-        random.shuffle(songs)
+        random.shuffle(tracks)
     repeat = getattr(args, "repeat", False)
     repeat_count = getattr(args, "repeat_count", 0)
     iteration = 0
     try:
         while True:
-            for title, url in songs:
+            for title, url in tracks:
                 _do_search(title)
                 if not _last_results:
                     m(f"    Skipping {_truncate_title(title)} (not found)")
@@ -410,17 +415,21 @@ def like_track():
         },
     )
     config.liked_music.parent.mkdir(parents=True, exist_ok=True)
-    existing = (
-        config.liked_music.read_text().strip().splitlines()
-        if config.liked_music.exists()
-        else []
-    )
-    if any(title in line for line in existing):
-        m(f"    {_truncate_title(title)} already liked")
-        return
-    with open(config.liked_music, "a") as f:
-        f.write(f"{title}|{url}\n")
-    i(f"    Liked: {_truncate_title(title)}")
+    songs = []
+    if config.liked_music.exists():
+        try:
+            songs = json.loads(config.liked_music.read_text())
+        except (json.JSONDecodeError, OSError):
+            songs = []
+    match = next((s for s in songs if s.get("url") == url), None)
+    if match:
+        songs.remove(match)
+        config.liked_music.write_text(json.dumps(songs, indent=2))
+        i(f"    Unliked: {_truncate_title(title)}")
+    else:
+        songs.append({"title": title, "url": url})
+        config.liked_music.write_text(json.dumps(songs, indent=2))
+        i(f"    Liked: {_truncate_title(title)}")
 
 
 def search(query: str):
@@ -569,9 +578,11 @@ def radio(extra, args):
     signal.signal(signal.SIGTSTP, signal.SIG_IGN)
     player._radio_active = True
 
+    radio_stop = threading.Event()
+
     def _radio_input_reader():
         try:
-            while True:
+            while not radio_stop.is_set():
                 try:
                     ch = os.read(fd, 1)
                 except OSError as ex:
@@ -638,6 +649,9 @@ def radio(extra, args):
         _radio_quit = True
     finally:
         player._radio_active = False
+        radio_stop.set()
+        if radio_reader.is_alive():
+            radio_reader.join(timeout=0.2)
         if old_term is not None:
             try:
                 if old_fd_flags is not None:
@@ -820,6 +834,46 @@ def playlist_cmd(extra, args):
         i(f"  {name}:")
         for idx, s in enumerate(songs, 1):
             m(f"  {idx}. {_truncate_title(s['title'])}")
+
+    elif subcmd == "play":
+        if len(extra) < 2:
+            e("Usage: playlist play <name>")
+            return
+        name = extra[1]
+        songs = playlist.get(name)
+        if not songs:
+            m(f"Playlist '{name}' is empty or not found")
+            return
+        tracks = list(songs)
+        if getattr(args, "shuffle", False):
+            random.shuffle(tracks)
+        repeat = getattr(args, "repeat", False)
+        repeat_count = getattr(args, "repeat_count", 0)
+        iteration = 0
+        if getattr(args, "bg", False):
+            if not _fork_bg(f"Playing playlist: {name}"):
+                return
+        try:
+            while True:
+                for idx, s in enumerate(tracks):
+                    vid = s.get("video_id", "")
+                    title = s.get("title", "Unknown")
+                    url = s.get("url") or f"https://www.youtube.com/watch?v={vid}"
+                    short = _truncate_title(title)
+                    print(f"{P}Fetching: {short}...{R}", end="\r", flush=True)
+                    entry = youtube.get_entry(url)
+                    if not entry:
+                        m(f"    Skipping {short} (unavailable)")
+                        continue
+                    _last_played = (entry, title)
+                    player.play_entry(entry, title, args)
+                if not repeat:
+                    break
+                iteration += 1
+                if repeat_count > 0 and iteration >= repeat_count:
+                    break
+        except KeyboardInterrupt:
+            pass
 
     else:
         name = extra[0]

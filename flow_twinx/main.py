@@ -1,4 +1,5 @@
 import argparse
+import builtins
 import importlib
 import sys
 import threading
@@ -10,6 +11,8 @@ import psutil
 if __name__ == "__main__" and __package__ is None:
     __package__ = "flow_twinx"
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import warnings
 
 from flow_twinx import shortcuts
 from flow_twinx.Offline import commands as _offline_commands
@@ -41,6 +44,18 @@ def kill_port(port):
             except psutil.NoSuchProcess, psutil.AccessDenied:
                 return False
     return False
+
+
+def _run_web(port):
+    from flow_twinx.web.app import app
+
+    WEB_PID = Path.home() / ".flow/web.pid"
+    WEB_PORT = Path.home() / ".flow/web_port"
+    try:
+        app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
+    finally:
+        WEB_PID.unlink(missing_ok=True)
+        WEB_PORT.unlink(missing_ok=True)
 
 
 def _spinner(stop):
@@ -95,6 +110,16 @@ def main():
         "--web-stop", action="store_true", help="stop running web server"
     )
     parser.add_argument(
+        "--web-new",
+        action="store_true",
+        help="start web server on next available port without prompting",
+    )
+    parser.add_argument(
+        "--stop-all",
+        action="store_true",
+        help="stop all background processes (VLC + web server)",
+    )
+    parser.add_argument(
         "command", nargs="?", default=None, help="subcommand (play, search, list, ...)"
     )
     parser.add_argument("--check", action="store_true", help="check all dependencies")
@@ -108,6 +133,26 @@ def main():
 
     WEB_PID = Path.home() / ".flow/web.pid"
     WEB_PORT = Path.home() / ".flow/web_port"
+
+    if getattr(args, "stop_all", False):
+        stopped = []
+        if config.kill_stored():
+            stopped.append("VLC")
+        if WEB_PID.exists():
+            try:
+                pid = int(WEB_PID.read_text().strip())
+                port = int(WEB_PORT.read_text().strip()) if WEB_PORT.exists() else 5000
+                kill_port(port)
+                stopped.append(f"web server (PID: {pid})")
+            except ProcessLookupError, ValueError, OSError:
+                stopped.append("web server (zombie, cleaned up)")
+            WEB_PID.unlink(missing_ok=True)
+            WEB_PORT.unlink(missing_ok=True)
+        if stopped:
+            print(f"{P}Stopped: {', '.join(stopped)}{R}")
+        else:
+            print(f"{M}No background processes running{R}")
+        sys.exit(0)
 
     if getattr(args, "web_stop", False):
         if WEB_PID.exists():
@@ -126,11 +171,58 @@ def main():
             print(f"{M}Web server not running{R}")
         sys.exit(0)
 
-    if getattr(args, "web", False):
+    if getattr(args, "web", False) or getattr(args, "web_new", False):
         import os
+        import signal
 
         WEB_PID.parent.mkdir(parents=True, exist_ok=True)
-        from flow_twinx.web.app import app
+
+        if getattr(args, "web", False):
+            existing_pid = None
+            existing_port = None
+            if WEB_PID.exists():
+                try:
+                    existing_pid = int(WEB_PID.read_text().strip())
+                    existing_port = (
+                        int(WEB_PORT.read_text().strip()) if WEB_PORT.exists() else None
+                    )
+                except ValueError, OSError:
+                    pass
+
+            existing_alive = False
+            if existing_pid is not None:
+                try:
+                    proc = psutil.Process(existing_pid)
+                    existing_alive = proc.is_running()
+                except psutil.NoSuchProcess:
+                    pass
+
+            if existing_alive:
+                port_str = f" on port {existing_port}" if existing_port else ""
+                answer = builtins.input(
+                    f"{P}A web server is already running{port_str}. "
+                    f"Kill it and restart? (y/N) {R}"
+                )
+                if answer.lower() not in ("y", "yes"):
+                    print(f"{M}Aborted.{R}")
+                    print(f"{M}Use -new to start a new server.{R}")
+                    sys.exit(0)
+                if existing_port:
+                    kill_port(existing_port)
+                    for _ in range(10):
+                        if not any(
+                            c.laddr and c.laddr.port == existing_port
+                            for c in psutil.net_connections(kind="inet")
+                        ):
+                            break
+                        time.sleep(0.2)
+                else:
+                    try:
+                        os.kill(existing_pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                WEB_PID.unlink(missing_ok=True)
+                WEB_PORT.unlink(missing_ok=True)
 
         port = None
         for p in range(5000, 5006):
@@ -147,6 +239,9 @@ def main():
             sys.exit(1)
 
         if not config.DEV_MODE:
+            warnings.filterwarnings(
+                "ignore", category=DeprecationWarning, message=".*fork.*"
+            )
             pid = os.fork()
             if pid > 0:
                 WEB_PID.write_text(str(pid))
@@ -156,16 +251,12 @@ def main():
             devnull = os.open(os.devnull, os.O_RDWR)
             os.dup2(devnull, 1)
             os.dup2(devnull, 2)
+            _run_web(port)
         else:
             WEB_PID.write_text(str(os.getpid()))
             WEB_PORT.write_text(str(port))
             print(f"{P}Flow web server → http://127.0.0.1:{port} (dev){R}")
-
-        try:
-            app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
-        finally:
-            WEB_PID.unlink(missing_ok=True)
-            WEB_PORT.unlink(missing_ok=True)
+            _run_web(port)
         return
 
     shortcuts.load()
