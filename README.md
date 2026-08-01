@@ -38,7 +38,7 @@ pip install flow-twinx
 flow
 ```
 
-### Note: Make sure you vlc installed or it will not play music.
+### Note: Make sure vlc is installed it can break on some PC but mostly work without vlc.
 
 ## Usage
 
