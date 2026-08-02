@@ -138,11 +138,12 @@ def _spinner(stop, label="Searching"):
 
 
 def _do_search(query):
-    global _last_results
+    global _last_results, _radio_tracks
     stop = False
     t = threading.Thread(target=_spinner, args=(lambda: stop,), daemon=True)
     t.start()
     _last_results = youtube.search(query, config.MAX_SEARCH_RESULTS)
+    _radio_tracks = []
     stop = True
     t.join()
 
