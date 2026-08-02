@@ -4,17 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flow-twinx"
-version = "0.5.0"
+version = "0.5.1"
 description = "A terminal music player with online and offline modes"
 readme = "README.md"
 requires-python = ">=3.14"
-dynamic = ["dependencies"]
+dynamic = []
+dependencies = [
+    "flask",
+    "numpy",
+    "psutil>=7.2.2",
+    "python-vlc",
+    "sounddevice",
+    "toml>=0.10.2",
+    "yt_dlp",
+    "ytmusicapi",
+]
 
 [project.scripts]
 flow = "flow_twinx.main:main"
-
-[tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.packages.find]
 where = ["."]
